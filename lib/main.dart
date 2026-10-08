@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import 'src/app.dart';
+import 'src/routes/routes.dart';
+import 'src/utiles/datos.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Datos.cargar(); // recupera lo guardado antes de abrir la app
   runApp(const MyApp());
 }
 
@@ -13,11 +16,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'AulaCheck',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
-      home: const AppPage(), 
+      initialRoute: Rutas.home,
+      onGenerateRoute: Rutas.generarRuta,
     );
   }
 }

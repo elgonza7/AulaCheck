@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'pages/inicio.dart'; // Ajusta la ruta si es necesario
+import 'pages/home_page.dart';
 
 class AppPage extends StatefulWidget {
   const AppPage({super.key});
@@ -11,7 +11,7 @@ class AppPage extends StatefulWidget {
 class _AppPageState extends State<AppPage> {
   int _indiceActual = 0;
   final List<Widget> _vistas = [
-    const InicioPage(),
+    const Homepage(),
     const Center(child: Text('Página de Ajustes / Otra sección')),
   ];
 
