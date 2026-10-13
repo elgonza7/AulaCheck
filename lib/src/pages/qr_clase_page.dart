@@ -1,9 +1,12 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+
 import './Components/models.dart';
 import '../utiles/datos.dart';
 import '../utiles/pdf_helper.dart';
+import '../utiles/layout_base.dart';
 
 // Muestra el QR de una clase. Dura 10 minutos y después se puede volver a generar.
 class QrClasePage extends StatefulWidget {
@@ -59,7 +62,9 @@ class _QrClasePageState extends State<QrClasePage> {
   List<Alumno> alumnosOrdenados() {
     final lista = List<Alumno>.from(widget.clase.alumnos); // orden de llegada
     if (ordenAlfabetico) {
-      lista.sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+      lista.sort(
+        (a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()),
+      );
     }
     return lista;
   }
@@ -70,8 +75,9 @@ class _QrClasePageState extends State<QrClasePage> {
     final alumnos = alumnosOrdenados();
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('${widget.materia.nombre} - ${clase.fecha}'),
+      appBar: aulaAppBar(
+        context,
+        '${widget.materia.nombre} - ${clase.fecha}',
         actions: [
           IconButton(
             icon: const Icon(Icons.picture_as_pdf),
@@ -94,11 +100,7 @@ class _QrClasePageState extends State<QrClasePage> {
               label: const Text('Generar QR nuevo'),
             ),
           ] else ...[
-            QrImageView(
-              data: qrData,
-              size: 220,
-              backgroundColor: Colors.white,
-            ),
+            QrImageView(data: qrData, size: 220, backgroundColor: Colors.white),
             const SizedBox(height: 8),
             Text('Vence en ${tiempoRestante()}'),
           ],
@@ -110,7 +112,10 @@ class _QrClasePageState extends State<QrClasePage> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
                   'Presentes: ${alumnos.length}',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               Padding(
@@ -121,7 +126,8 @@ class _QrClasePageState extends State<QrClasePage> {
                     ButtonSegment(value: true, label: Text('A-Z')),
                   ],
                   selected: {ordenAlfabetico},
-                  onSelectionChanged: (v) => setState(() => ordenAlfabetico = v.first),
+                  onSelectionChanged: (v) =>
+                      setState(() => ordenAlfabetico = v.first),
                 ),
               ),
             ],
@@ -131,7 +137,10 @@ class _QrClasePageState extends State<QrClasePage> {
               children: [
                 for (final alumno in alumnos)
                   ListTile(
-                    leading: const Icon(Icons.check_circle, color: Colors.green),
+                    leading: const Icon(
+                      Icons.check_circle,
+                      color: Colors.green,
+                    ),
                     title: Text(alumno.nombre),
                     subtitle: Text('DNI: ${alumno.dni}'),
                   ),

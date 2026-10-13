@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../utiles/datos.dart';
 import './Components/models.dart';
 import 'page_class.dart';
+import '../utiles/layout_base.dart';
 
 class MateriasPage extends StatefulWidget {
   final Carrera carrera;
@@ -68,8 +69,7 @@ class _MateriasPageState extends State<MateriasPage> {
     final materias = widget.carrera.materias;
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.carrera.nombre)),
-      backgroundColor: Colors.grey.shade100,
+      appBar: aulaAppBar(context, widget.carrera.nombre),
       body: materias.isEmpty
           ? const Center(child: Text('Todavía no creaste materias'))
           : ListView.builder(

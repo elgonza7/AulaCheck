@@ -3,6 +3,7 @@ import './Components/models.dart';
 import '../utiles/datos.dart';
 import '../utiles/pdf_helper.dart';
 import 'qr_clase_page.dart';
+import '../utiles/layout_base.dart';
 
 class PageClass extends StatefulWidget {
   final Materia materia;
@@ -49,9 +50,9 @@ class _PageClassState extends State<PageClass> {
     final clases = widget.materia.clases;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.materia.nombre),
-        centerTitle: true,
+      appBar: aulaAppBar(
+        context,
+        widget.materia.nombre,
         actions: [
           IconButton(
             icon: const Icon(Icons.picture_as_pdf),

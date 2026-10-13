@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import './Components/models.dart';
 import '../utiles/datos.dart';
 import 'carreras_page.dart';
+import '../utiles/layout_base.dart';
 
 class ProfessorPage extends StatefulWidget {
   const ProfessorPage({super.key});
@@ -94,7 +95,7 @@ class _ProfessorPageState extends State<ProfessorPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Panel Docente')),
+      appBar: aulaAppBar(context, 'Panel Docente'),
       body: cargando
           ? const Center(child: CircularProgressIndicator())
           : profesor == null

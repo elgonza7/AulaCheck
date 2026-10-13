@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import './Components/models.dart';
 import '../utiles/datos.dart';
 import 'scanner_page.dart';
+import '../utiles/layout_base.dart';
 
 class AlumnoPage extends StatefulWidget {
   const AlumnoPage({super.key});
@@ -171,7 +172,7 @@ class _AlumnoPageState extends State<AlumnoPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Panel de Alumno')),
+      appBar: aulaAppBar(context, 'Panel de Alumno'),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(

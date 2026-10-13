@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../utiles/layout_base.dart';
 
 // Abre la cámara y devuelve (con Navigator.pop) el texto del primer QR detectado.
 class ScannerPage extends StatefulWidget {
@@ -15,7 +16,7 @@ class _ScannerPageState extends State<ScannerPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Escanear QR')),
+      appBar: aulaAppBar(context, 'Escanear QR'),
       body: MobileScanner(
         onDetect: (captura) {
           if (yaLeyo) return;
