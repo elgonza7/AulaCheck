@@ -1,5 +1,7 @@
 import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../pages/Components/models.dart';
 
 // Datos compartidos entre pantallas (viven solo mientras la app está abierta).
@@ -12,6 +14,8 @@ class Datos {
 
   // Cuánto dura un QR antes de vencer
   static const int minutosValidez = 10;
+
+  static const String claveAsistenciaDispositivo = 'asistencia_dispositivo_';
 
   // Guarda todas las carreras (con sus materias, clases y asistencias) en el celular.
   // Hay que llamarla cada vez que se cambia algo.
@@ -35,6 +39,17 @@ class Datos {
     } catch (_) {
       // Si los datos guardados están dañados, se arranca de cero
     }
+  }
+
+  // Cada dispositivo puede registrar una sola asistencia por clase.
+  static Future<bool> dispositivoYaRegistro(String claseId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('$claveAsistenciaDispositivo$claseId') ?? false;
+  }
+
+  static Future<void> guardarAsistenciaDispositivo(String claseId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('$claveAsistenciaDispositivo$claseId', true);
   }
 
   // Crea la carrera y la materia si todavía no existen

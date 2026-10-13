@@ -38,17 +38,37 @@ class _AlumnoPageState extends State<AlumnoPage> {
   }
 
   Future<void> guardarDatos() async {
+    final nuevoNombre = ctrlNombre.text.trim();
+    final nuevoDni = ctrlDni.text.trim();
+
+    if (nombre.isNotEmpty || dni.isNotEmpty) {
+      mostrarError('Este dispositivo ya tiene un alumno cargado');
+      return;
+    }
+
+    if (nuevoNombre.isEmpty || nuevoDni.isEmpty) {
+      mostrarError('Completá el nombre y el DNI');
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('nombre', ctrlNombre.text);
-    await prefs.setString('dni', ctrlDni.text);
+    await prefs.setString('nombre', nuevoNombre);
+    await prefs.setString('dni', nuevoDni);
     setState(() {
-      nombre = ctrlNombre.text;
-      dni = ctrlDni.text;
+      nombre = nuevoNombre;
+      dni = nuevoDni;
     });
     if (mounted) Navigator.pop(context);
   }
 
   void modalInfo() {
+    if (nombre.isNotEmpty || dni.isNotEmpty) {
+      mostrarError('Este dispositivo ya tiene un alumno cargado');
+      return;
+    }
+
+    ctrlNombre.clear();
+    ctrlDni.clear();
     ctrlNombre.text = nombre;
     ctrlDni.text = dni;
     showDialog(
@@ -144,6 +164,11 @@ class _AlumnoPageState extends State<AlumnoPage> {
         return;
       }
 
+      if (await Datos.dispositivoYaRegistro(clase.id)) {
+        mostrarError('Este dispositivo ya registró asistencia en esta clase');
+        return;
+      }
+
       final dniNumero = int.tryParse(dni) ?? 0;
       final registrado = clase.registrarAsistencia(
         Alumno(nombre: nombre, registro: dniNumero, dni: dniNumero),
@@ -153,6 +178,7 @@ class _AlumnoPageState extends State<AlumnoPage> {
         return;
       }
       Datos.guardar();
+      await Datos.guardarAsistenciaDispositivo(clase.id);
 
       setState(() {
         claseInfo = clase.materia;
@@ -187,7 +213,9 @@ class _AlumnoPageState extends State<AlumnoPage> {
             ElevatedButton.icon(
               onPressed: modalInfo,
               icon: const Icon(Icons.person),
-              label: const Text('Agregar informacion'),
+              label: Text(
+                nombre.isEmpty ? 'Agregar informacion' : 'Alumno configurado',
+              ),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
