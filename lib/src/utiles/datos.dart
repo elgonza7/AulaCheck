@@ -14,6 +14,7 @@ class Datos {
 
   // Cuánto dura un QR antes de vencer
   static const int minutosValidez = 10;
+  static const double radioAsistenciaMetros = 100;
 
   static const String claveAsistenciaDispositivo = 'asistencia_dispositivo_';
 
@@ -52,6 +53,11 @@ class Datos {
     await prefs.setBool('$claveAsistenciaDispositivo$claseId', true);
   }
 
+  static Future<void> eliminarAsistenciaDispositivo(String claseId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('$claveAsistenciaDispositivo$claseId');
+  }
+
   // Crea la carrera y la materia si todavía no existen
   static void agregarMateria(String carrera, String materia) {
     var c = carreras.where((c) => c.nombre == carrera).firstOrNull;
@@ -64,15 +70,28 @@ class Datos {
     guardar();
   }
 
-  // Texto que se guarda dentro del QR: aulacheck|idClase|momento
-  static String generarQr(Clase clase) {
-    return 'aulacheck|${clase.id}|${DateTime.now().millisecondsSinceEpoch}';
+  // Texto que se guarda dentro del QR: aulacheck|idClase|momento|latitud|longitud
+  static String generarQr(Clase clase, double latitud, double longitud) {
+    return 'aulacheck|${clase.id}|${DateTime.now().millisecondsSinceEpoch}|$latitud|$longitud';
+  }
+
+  static ({double latitud, double longitud})? ubicacionQr(String codigo) {
+    final partes = codigo.split('|');
+    if (partes.length != 5 || partes[0] != 'aulacheck') return null;
+
+    final latitud = double.tryParse(partes[3]);
+    final longitud = double.tryParse(partes[4]);
+    if (latitud == null || longitud == null) return null;
+    if (latitud < -90 || latitud > 90 || longitud < -180 || longitud > 180) {
+      return null;
+    }
+    return (latitud: latitud, longitud: longitud);
   }
 
   // Devuelve la clase si el QR es válido y no venció, o null si no sirve.
   static Clase? validarQr(String codigo) {
     final partes = codigo.split('|');
-    if (partes.length != 3 || partes[0] != 'aulacheck') return null;
+    if (partes.length != 5 || partes[0] != 'aulacheck') return null;
 
     final clase = claseActiva;
     if (clase == null || clase.id != partes[1]) return null;

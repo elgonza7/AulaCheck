@@ -133,30 +133,40 @@ class _AlumnoPageState extends State<AlumnoPage> {
     }
 
     try {
-      Position pos = await Geolocator.getCurrentPosition();
-      
-      double latUni = -31.5414;
-      double lngUni = -68.5255;
-      
-      double dist = Geolocator.distanceBetween(
-        pos.latitude, pos.longitude, latUni, lngUni
-      );
-
-      if (dist > 150) {
-        mostrarError('Estas demasiado lejos del aula. Distancia: ${dist.toInt()}m');
-        setState(() => cargando = false);
-        return;
-      }
-      
-      setState(() => cargando = false);
+      final pos = await Geolocator.getCurrentPosition();
       if (!mounted) return;
 
-      // Ubicación correcta: ahora se escanea el QR del profesor
       final codigo = await Navigator.push<String>(
         context,
         MaterialPageRoute(builder: (_) => const ScannerPage()),
       );
-      if (codigo == null) return;
+      if (codigo == null) {
+        setState(() => cargando = false);
+        return;
+      }
+      setState(() => cargando = false);
+
+      final ubicacionQr = Datos.ubicacionQr(codigo);
+      if (ubicacionQr == null) {
+        mostrarError('QR inválido: no contiene una ubicación válida');
+        return;
+      }
+
+      final dist = Geolocator.distanceBetween(
+        pos.latitude,
+        pos.longitude,
+        ubicacionQr.latitud,
+        ubicacionQr.longitud,
+      );
+
+      if (dist > Datos.radioAsistenciaMetros) {
+        mostrarError(
+          'Estás demasiado lejos del profesor. '
+          'Distancia: ${dist.toInt()} m '
+          '(máximo ${Datos.radioAsistenciaMetros.toInt()} m)',
+        );
+        return;
+      }
 
       final clase = Datos.validarQr(codigo);
       if (clase == null) {

@@ -23,6 +23,7 @@ class _MateriasPageState extends State<MateriasPage> {
   }
 
   void addMateria() {
+    ctrl.clear();
     showDialog(
       context: context,
       builder: (BuildContext ctx) {
@@ -64,6 +65,58 @@ class _MateriasPageState extends State<MateriasPage> {
     );
   }
 
+  void editarMateria(Materia materia) {
+    ctrl.text = materia.nombre;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Editar materia'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Nombre de la materia',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              final nombre = ctrl.text.trim();
+              if (nombre.isEmpty) return;
+              setState(() => materia.nombre = nombre);
+              Datos.guardar();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> eliminarMateria(Materia materia) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar materia'),
+        content: Text('¿Eliminar "${materia.nombre}" y todas sus clases?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmar != true || !mounted) return;
+    setState(() => widget.carrera.materias.remove(materia));
+    await Datos.guardar();
+  }
+
   @override
   Widget build(BuildContext context) {
     final materias = widget.carrera.materias;
@@ -84,7 +137,16 @@ class _MateriasPageState extends State<MateriasPage> {
                     title: Text(m.nombre),
                     subtitle: Text('${m.clases.length} clases'),
                     leading: const Icon(Icons.class_, color: Colors.blue),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (accion) {
+                        if (accion == 'editar') editarMateria(m);
+                        if (accion == 'eliminar') eliminarMateria(m);
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: 'editar', child: Text('Editar')),
+                        PopupMenuItem(value: 'eliminar', child: Text('Eliminar')),
+                      ],
+                    ),
                     onTap: () async {
                       await Navigator.push(
                         context,

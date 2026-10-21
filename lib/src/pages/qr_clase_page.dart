@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import './Components/models.dart';
@@ -23,6 +24,8 @@ class _QrClasePageState extends State<QrClasePage> {
   late String qrData;
   late DateTime vence;
   bool ordenAlfabetico = false;
+  bool cargandoUbicacion = true;
+  String? errorUbicacion;
   Timer? timer;
 
   bool get vencido => !DateTime.now().isBefore(vence);
@@ -31,7 +34,7 @@ class _QrClasePageState extends State<QrClasePage> {
   void initState() {
     super.initState();
     Datos.claseActiva = widget.clase;
-    generarNuevoQr();
+    inicializarQr();
 
     // Cada segundo se actualiza el contador y la lista de presentes
     timer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -46,9 +49,54 @@ class _QrClasePageState extends State<QrClasePage> {
     super.dispose();
   }
 
-  void generarNuevoQr() {
-    qrData = Datos.generarQr(widget.clase);
-    vence = DateTime.now().add(const Duration(minutes: Datos.minutosValidez));
+  Future<void> inicializarQr() async {
+    try {
+      final posicion = await obtenerUbicacion();
+      if (!mounted) return;
+      qrData = Datos.generarQr(
+        widget.clase,
+        posicion.latitude,
+        posicion.longitude,
+      );
+      vence = DateTime.now().add(const Duration(minutes: Datos.minutosValidez));
+      setState(() {
+        cargandoUbicacion = false;
+        errorUbicacion = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        cargandoUbicacion = false;
+        errorUbicacion = e.toString();
+      });
+    }
+  }
+
+  Future<Position> obtenerUbicacion() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      throw Exception('Activá el GPS para generar el QR');
+    }
+
+    var permiso = await Geolocator.checkPermission();
+    if (permiso == LocationPermission.denied) {
+      permiso = await Geolocator.requestPermission();
+    }
+    if (permiso == LocationPermission.denied ||
+        permiso == LocationPermission.deniedForever) {
+      throw Exception('Se necesita permiso de ubicación');
+    }
+
+    return Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+  }
+
+  Future<void> generarNuevoQr() async {
+    setState(() {
+      cargandoUbicacion = true;
+      errorUbicacion = null;
+    });
+    await inicializarQr();
   }
 
   String tiempoRestante() {
@@ -67,6 +115,75 @@ class _QrClasePageState extends State<QrClasePage> {
       );
     }
     return lista;
+  }
+
+  Future<void> eliminarAsistencia(Alumno alumno) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar asistencia'),
+        content: Text('¿Eliminar la asistencia de ${alumno.nombre}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmar != true || !mounted) return;
+    setState(() => widget.clase.alumnos.remove(alumno));
+    await Datos.eliminarAsistenciaDispositivo(widget.clase.id);
+    await Datos.guardar();
+  }
+
+  Future<void> editarAsistencia(Alumno alumno) async {
+    final nombreCtrl = TextEditingController(text: alumno.nombre);
+    final dniCtrl = TextEditingController(text: alumno.dni.toString());
+    final datos = await showDialog<({String nombre, int dni})>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Corregir asistencia'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nombreCtrl,
+              decoration: const InputDecoration(labelText: 'Nombre completo'),
+            ),
+            TextField(
+              controller: dniCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'DNI o registro'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              final nombre = nombreCtrl.text.trim();
+              final dni = int.tryParse(dniCtrl.text.trim());
+              if (nombre.isNotEmpty && dni != null) {
+                Navigator.pop(ctx, (nombre: nombre, dni: dni));
+              }
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    nombreCtrl.dispose();
+    dniCtrl.dispose();
+    if (datos == null || !mounted) return;
+    setState(() {
+      alumno.nombre = datos.nombre;
+      alumno.dni = datos.dni;
+      alumno.registro = datos.dni;
+    });
+    await Datos.guardar();
   }
 
   @override
@@ -89,7 +206,38 @@ class _QrClasePageState extends State<QrClasePage> {
       body: Column(
         children: [
           const SizedBox(height: 24),
-          if (vencido) ...[
+          if (cargandoUbicacion)
+            const Expanded(
+              child: Center(
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (errorUbicacion != null)
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.location_off, size: 64, color: Colors.red),
+                      const SizedBox(height: 12),
+                      Text(
+                        errorUbicacion!,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: generarNuevoQr,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Reintentar'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else if (vencido) ...[
             const Icon(Icons.timer_off, size: 80, color: Colors.grey),
             const SizedBox(height: 8),
             const Text('El QR venció'),
@@ -143,6 +291,16 @@ class _QrClasePageState extends State<QrClasePage> {
                     ),
                     title: Text(alumno.nombre),
                     subtitle: Text('DNI: ${alumno.dni}'),
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (accion) {
+                        if (accion == 'editar') editarAsistencia(alumno);
+                        if (accion == 'eliminar') eliminarAsistencia(alumno);
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: 'editar', child: Text('Corregir')),
+                        PopupMenuItem(value: 'eliminar', child: Text('Eliminar')),
+                      ],
+                    ),
                   ),
               ],
             ),

@@ -15,6 +15,56 @@ class PageClass extends StatefulWidget {
 }
 
 class _PageClassState extends State<PageClass> {
+  Future<void> editarClase(Clase clase) async {
+    final ctrl = TextEditingController(text: clase.nombre);
+    final nombre = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Editar clase'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Nombre de la clase',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (nombre == null || nombre.isEmpty || !mounted) return;
+    setState(() => clase.nombre = nombre);
+    await Datos.guardar();
+  }
+
+  Future<void> eliminarClase(Clase clase) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar clase'),
+        content: Text('¿Eliminar "${clase.nombre}" y sus asistencias?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmar != true || !mounted) return;
+    setState(() => widget.materia.clases.remove(clase));
+    await Datos.guardar();
+  }
+
   Future<void> nuevaClase() async {
     final materia = widget.materia;
     final hoy = Clase(nombre: '', materia: materia.nombre, alumnos: []).fecha;
@@ -81,7 +131,16 @@ class _PageClassState extends State<PageClass> {
                 leading: const Icon(Icons.event, color: Colors.blue),
                 title: Text('${clase.nombre} - ${clase.fecha}'),
                 subtitle: Text('${clase.alumnos.length} presentes'),
-                trailing: const Icon(Icons.qr_code),
+                trailing: PopupMenuButton<String>(
+                  onSelected: (accion) {
+                    if (accion == 'editar') editarClase(clase);
+                    if (accion == 'eliminar') eliminarClase(clase);
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'editar', child: Text('Editar')),
+                    PopupMenuItem(value: 'eliminar', child: Text('Eliminar')),
+                  ],
+                ),
                 onTap: () => abrirQr(clase),
               ),
             ),
