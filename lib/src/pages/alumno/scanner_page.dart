@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import '../utiles/layout_base.dart';
+import 'package:aulacheck/src/widgets/layout_base.dart';
 
 // Abre la cámara y devuelve (con Navigator.pop) el texto del primer QR detectado.
 class ScannerPage extends StatefulWidget {

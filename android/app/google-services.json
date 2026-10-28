@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "821742381309",
+    "project_id": "aulacheck-d4c70",
+    "storage_bucket": "aulacheck-d4c70.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:821742381309:android:91977b6d421f686f313694",
+        "android_client_info": {
+          "package_name": "com.example.aulacheck"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAFS0_ol1yJoSD5wVK0N5PS_3oQeHNWFKY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

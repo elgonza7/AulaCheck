@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import './Components/models.dart';
-import '../utiles/datos.dart';
-import '../utiles/pdf_helper.dart';
-import '../utiles/layout_base.dart';
+import 'package:aulacheck/src/models/models.dart';
+import 'package:aulacheck/src/services/datos.dart';
+import 'package:aulacheck/src/services/pdf_service.dart';
+import 'package:aulacheck/src/widgets/layout_base.dart';
 
 // Muestra el QR de una clase. Dura 10 minutos y después se puede volver a generar.
 class QrClasePage extends StatefulWidget {
@@ -27,14 +27,21 @@ class _QrClasePageState extends State<QrClasePage> {
   bool cargandoUbicacion = true;
   String? errorUbicacion;
   Timer? timer;
+  StreamSubscription<List<Alumno>>? suscripcionAsistencias;
 
   bool get vencido => !DateTime.now().isBefore(vence);
 
   @override
   void initState() {
     super.initState();
-    Datos.claseActiva = widget.clase;
     inicializarQr();
+
+    // Escucha en la nube a los alumnos que van registrando su asistencia
+    suscripcionAsistencias =
+        Datos.escucharAsistencias(widget.clase.id).listen((presentes) {
+      if (!mounted) return;
+      setState(() => widget.clase.alumnos = presentes);
+    });
 
     // Cada segundo se actualiza el contador y la lista de presentes
     timer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -45,7 +52,8 @@ class _QrClasePageState extends State<QrClasePage> {
   @override
   void dispose() {
     timer?.cancel();
-    Datos.claseActiva = null;
+    suscripcionAsistencias?.cancel();
+    Datos.cerrarQr(widget.clase.id); // al salir, el QR deja de servir
     super.dispose();
   }
 
@@ -59,6 +67,8 @@ class _QrClasePageState extends State<QrClasePage> {
         posicion.longitude,
       );
       vence = DateTime.now().add(const Duration(minutes: Datos.minutosValidez));
+      await Datos.publicarQr(widget.clase, qrData); // el alumno lo valida contra la nube
+      if (!mounted) return;
       setState(() {
         cargandoUbicacion = false;
         errorUbicacion = null;
@@ -135,6 +145,7 @@ class _QrClasePageState extends State<QrClasePage> {
     );
     if (confirmar != true || !mounted) return;
     setState(() => widget.clase.alumnos.remove(alumno));
+    await Datos.eliminarAsistenciaRemota(widget.clase.id, alumno.dni);
     await Datos.eliminarAsistenciaDispositivo(widget.clase.id);
     await Datos.guardar();
   }
@@ -178,11 +189,13 @@ class _QrClasePageState extends State<QrClasePage> {
     nombreCtrl.dispose();
     dniCtrl.dispose();
     if (datos == null || !mounted) return;
+    final dniAnterior = alumno.dni;
     setState(() {
       alumno.nombre = datos.nombre;
       alumno.dni = datos.dni;
       alumno.registro = datos.dni;
     });
+    await Datos.actualizarAsistenciaRemota(widget.clase.id, dniAnterior, alumno);
     await Datos.guardar();
   }
 

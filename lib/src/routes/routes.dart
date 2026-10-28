@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../pages/alumno_page.dart';
-import '../pages/professor_page.dart';
-import '../pages/home_page.dart';
-import '../pages/carreras_page.dart';
-import '../pages/settings_page.dart';
+import 'package:aulacheck/src/pages/alumno/alumno_page.dart';
+import 'package:aulacheck/src/pages/profesor/professor_page.dart';
+import 'package:aulacheck/src/pages/home/home_page.dart';
+import 'package:aulacheck/src/pages/profesor/carreras_page.dart';
+import 'package:aulacheck/src/pages/settings/settings_page.dart';
 
 class Rutas {
   static const String home = '/';

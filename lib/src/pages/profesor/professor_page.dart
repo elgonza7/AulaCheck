@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import './Components/models.dart';
-import '../utiles/datos.dart';
-import 'carreras_page.dart';
-import '../utiles/layout_base.dart';
+import 'package:aulacheck/src/models/models.dart';
+import 'package:aulacheck/src/services/datos.dart';
+import 'package:aulacheck/src/pages/profesor/carreras_page.dart';
+import 'package:aulacheck/src/widgets/layout_base.dart';
 
 class ProfessorPage extends StatefulWidget {
   const ProfessorPage({super.key});
@@ -79,6 +79,7 @@ class _ProfessorPageState extends State<ProfessorPage> {
     await prefs.setString('prof_materia', nuevo.materia);
 
     Datos.profesor = nuevo;
+    await Datos.cargar(); // si ese DNI ya tenía datos en la nube, los recupera
     Datos.agregarMateria(nuevo.carrera, nuevo.materia);
 
     if (mounted) setState(() => profesor = nuevo);

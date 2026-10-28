@@ -1,17 +1,8 @@
 import 'package:flutter/material.dart';
-import '../utiles/layout_base.dart';
-import 'alumno_page.dart';
-import 'professor_page.dart';
+import 'package:aulacheck/src/widgets/layout_base.dart';
+import 'package:aulacheck/src/pages/alumno/alumno_page.dart';
+import 'package:aulacheck/src/pages/profesor/professor_page.dart';
 
-
-class Homepage extends StatelessWidget {
-  const Homepage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const HomePage();
-  }
-}
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});

@@ -1,6 +1,6 @@
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import '../pages/Components/models.dart';
+import 'package:aulacheck/src/models/models.dart';
 
 String _hora(DateTime h) =>
     '${h.hour.toString().padLeft(2, '0')}:${h.minute.toString().padLeft(2, '0')}';

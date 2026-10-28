@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import './Components/models.dart';
-import '../utiles/datos.dart';
-import '../utiles/pdf_helper.dart';
-import 'qr_clase_page.dart';
-import '../utiles/layout_base.dart';
+import 'package:aulacheck/src/models/models.dart';
+import 'package:aulacheck/src/services/datos.dart';
+import 'package:aulacheck/src/services/pdf_service.dart';
+import 'package:aulacheck/src/pages/profesor/qr_clase_page.dart';
+import 'package:aulacheck/src/widgets/layout_base.dart';
 
 class PageClass extends StatefulWidget {
   final Materia materia;

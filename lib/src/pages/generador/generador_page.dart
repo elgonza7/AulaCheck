@@ -7,7 +7,7 @@ import 'package:flutter/rendering.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import 'responsive.dart';
+import 'package:aulacheck/src/utils/responsive.dart';
 
 class GeneradorPage extends StatefulWidget {
   const GeneradorPage({super.key});

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../pages/settings_page.dart';
+import 'package:aulacheck/src/pages/settings/settings_page.dart';
 
 PreferredSizeWidget aulaAppBar(
   BuildContext context,
@@ -47,12 +47,12 @@ class LayoutBase extends StatelessWidget {
           child: Column(
             children: [
               const SizedBox(height: 20),
+              // El hueco de la izquierda mide lo mismo que el botón de ajustes
+              // de la derecha (48 + 8), así el título queda realmente centrado.
               Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Spacer(),
+                  const SizedBox(width: 56),
                   const Expanded(
-                    flex: 2,
                     child: Center(
                       child: Text.rich(
                         TextSpan(

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../utiles/datos.dart';
-import './Components/models.dart';
-import 'materias_page.dart';
-import '../utiles/layout_base.dart';
+import 'package:aulacheck/src/services/datos.dart';
+import 'package:aulacheck/src/models/models.dart';
+import 'package:aulacheck/src/pages/profesor/materias_page.dart';
+import 'package:aulacheck/src/widgets/layout_base.dart';
 
 class CarrerasPage extends StatefulWidget {
   const CarrerasPage({super.key});

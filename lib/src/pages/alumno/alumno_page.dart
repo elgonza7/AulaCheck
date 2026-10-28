@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
-import './Components/models.dart';
-import '../utiles/datos.dart';
-import 'scanner_page.dart';
-import '../utiles/layout_base.dart';
+import 'package:aulacheck/src/models/models.dart';
+import 'package:aulacheck/src/services/datos.dart';
+import 'package:aulacheck/src/pages/alumno/scanner_page.dart';
+import 'package:aulacheck/src/widgets/layout_base.dart';
 
 class AlumnoPage extends StatefulWidget {
   const AlumnoPage({super.key});
@@ -168,35 +168,40 @@ class _AlumnoPageState extends State<AlumnoPage> {
         return;
       }
 
-      final clase = Datos.validarQr(codigo);
+      // El QR se valida contra la nube: tiene que ser el vigente del profesor
+      final clase = await Datos.validarQr(codigo);
+      if (!mounted) return;
       if (clase == null) {
         mostrarError('QR inválido o vencido, escaneá el actual');
         return;
       }
 
-      if (await Datos.dispositivoYaRegistro(clase.id)) {
+      final claseId = clase['id'] as String;
+      if (await Datos.dispositivoYaRegistro(claseId)) {
         mostrarError('Este dispositivo ya registró asistencia en esta clase');
         return;
       }
 
       final dniNumero = int.tryParse(dni) ?? 0;
-      final registrado = clase.registrarAsistencia(
+      final registrado = await Datos.registrarAsistenciaRemota(
+        clase,
         Alumno(nombre: nombre, registro: dniNumero, dni: dniNumero),
       );
+      if (!mounted) return;
       if (!registrado) {
         mostrarError('Ya registraste tu asistencia en esta clase');
         return;
       }
-      Datos.guardar();
-      await Datos.guardarAsistenciaDispositivo(clase.id);
+      await Datos.guardarAsistenciaDispositivo(claseId);
 
       setState(() {
-        claseInfo = clase.materia;
-        fechaInfo = clase.fecha;
+        claseInfo = clase['materia'] as String;
+        fechaInfo = clase['fecha'] as String;
       });
 
     } catch (e) {
-      mostrarError('Error obteniendo ubicacion');
+      if (!mounted) return;
+      mostrarError('No se pudo registrar la asistencia: $e');
       setState(() => cargando = false);
     }
   }
