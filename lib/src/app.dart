@@ -1,19 +1,28 @@
 import 'package:flutter/material.dart';
 
 import 'config/app_theme.dart';
-import 'package:aulacheck/src/routes/routes.dart';
+import 'config/tema_controller.dart';
+import 'routes/routes.dart';
 
 class AulaCheckApp extends StatelessWidget {
   const AulaCheckApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'AulaCheck',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.oscuro,
-      initialRoute: Rutas.home,
-      onGenerateRoute: Rutas.generarRuta,
+    // Cuando el usuario cambia el tema en Ajustes, este builder se ejecuta de nuevo
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: TemaController.modo,
+      builder: (context, modo, _) {
+        return MaterialApp(
+          title: 'AulaCheck',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.claro,
+          darkTheme: AppTheme.oscuro,
+          themeMode: modo,
+          initialRoute: Rutas.home,
+          onGenerateRoute: Rutas.generarRuta,
+        );
+      },
     );
   }
 }

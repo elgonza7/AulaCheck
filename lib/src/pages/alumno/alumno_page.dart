@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:aulacheck/src/models/models.dart';
 import 'package:aulacheck/src/services/datos.dart';
 import 'package:aulacheck/src/pages/alumno/scanner_page.dart';
+import 'package:aulacheck/src/config/app_theme.dart';
 import 'package:aulacheck/src/widgets/layout_base.dart';
 
 class AlumnoPage extends StatefulWidget {
@@ -29,11 +30,26 @@ class _AlumnoPageState extends State<AlumnoPage> {
     cargarDatos();
   }
 
+  // Fecha de hoy como texto, para saber si la última asistencia fue hoy
+  String diaDeHoy() {
+    final ahora = DateTime.now();
+    return '${ahora.year}-${ahora.month}-${ahora.day}';
+  }
+
   Future<void> cargarDatos() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+
+    // El aviso de "asistencia registrada" se muestra durante todo el día
+    final registradoHoy = prefs.getString('ultima_dia') == diaDeHoy();
+
     setState(() {
       nombre = prefs.getString('nombre') ?? "";
       dni = prefs.getString('dni') ?? "";
+      if (registradoHoy) {
+        claseInfo = prefs.getString('ultima_materia') ?? "";
+        fechaInfo = prefs.getString('ultima_fecha') ?? "";
+      }
     });
   }
 
@@ -41,13 +57,14 @@ class _AlumnoPageState extends State<AlumnoPage> {
     final nuevoNombre = ctrlNombre.text.trim();
     final nuevoDni = ctrlDni.text.trim();
 
-    if (nombre.isNotEmpty || dni.isNotEmpty) {
-      mostrarError('Este dispositivo ya tiene un alumno cargado');
+    if (nuevoNombre.isEmpty || nuevoDni.isEmpty) {
+      mostrarError('Completá el nombre y el DNI');
       return;
     }
 
-    if (nuevoNombre.isEmpty || nuevoDni.isEmpty) {
-      mostrarError('Completá el nombre y el DNI');
+    // El DNI se guarda como número en la asistencia, así que tiene que serlo
+    if (int.tryParse(nuevoDni) == null) {
+      mostrarError('El DNI tiene que ser un número');
       return;
     }
 
@@ -62,13 +79,7 @@ class _AlumnoPageState extends State<AlumnoPage> {
   }
 
   void modalInfo() {
-    if (nombre.isNotEmpty || dni.isNotEmpty) {
-      mostrarError('Este dispositivo ya tiene un alumno cargado');
-      return;
-    }
-
-    ctrlNombre.clear();
-    ctrlDni.clear();
+    // Si ya hay datos cargados se muestran para poder corregirlos
     ctrlNombre.text = nombre;
     ctrlDni.text = dni;
     showDialog(
@@ -87,6 +98,16 @@ class _AlumnoPageState extends State<AlumnoPage> {
               decoration: const InputDecoration(labelText: 'DNI o Registro'),
               keyboardType: TextInputType.number,
             ),
+            if (nombre.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Corregir tus datos no registra asistencia. Si ya registraste '
+                'hoy con un dato equivocado, pedile al profesor que lo corrija. '
+                'En tu próxima asistencia, el profesor va a ver que cambiaste '
+                'tus datos.',
+                style: TextStyle(fontSize: 12, color: ctx.textoSuave),
+              ),
+            ],
           ],
         ),
         actions: [
@@ -183,9 +204,23 @@ class _AlumnoPageState extends State<AlumnoPage> {
       }
 
       final dniNumero = int.tryParse(dni) ?? 0;
+
+      // ¿Cambió sus datos desde la última asistencia que registró?
+      // Si es así, se guardan los datos anteriores para avisarle al profesor.
+      final prefs = await SharedPreferences.getInstance();
+      final regNombre = prefs.getString('reg_nombre');
+      final regDni = int.tryParse(prefs.getString('reg_dni') ?? '');
+      final cambio = regDni != null && (regDni != dniNumero || regNombre != nombre);
+
       final registrado = await Datos.registrarAsistenciaRemota(
         clase,
-        Alumno(nombre: nombre, registro: dniNumero, dni: dniNumero),
+        Alumno(
+          nombre: nombre,
+          registro: dniNumero,
+          dni: dniNumero,
+          nombreAnterior: cambio ? regNombre : null,
+          dniAnterior: cambio ? regDni : null,
+        ),
       );
       if (!mounted) return;
       if (!registrado) {
@@ -193,6 +228,14 @@ class _AlumnoPageState extends State<AlumnoPage> {
         return;
       }
       await Datos.guardarAsistenciaDispositivo(claseId);
+
+      // Se recuerdan los datos con los que se registró y el aviso de "asistencia
+      // registrada", para que siga apareciendo aunque se salga de la pantalla.
+      await prefs.setString('reg_nombre', nombre);
+      await prefs.setString('reg_dni', dni);
+      await prefs.setString('ultima_dia', diaDeHoy());
+      await prefs.setString('ultima_materia', clase['materia'] as String);
+      await prefs.setString('ultima_fecha', clase['fecha'] as String);
 
       setState(() {
         claseInfo = clase['materia'] as String;
@@ -220,58 +263,118 @@ class _AlumnoPageState extends State<AlumnoPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (nombre.isNotEmpty) ...[
-              Text('Alumno: $nombre', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              Text('DNI: $dni', style: const TextStyle(fontSize: 16, color: Colors.grey)),
-              const SizedBox(height: 20),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 26,
+                        backgroundColor: AppTheme.violeta,
+                        child: Text(
+                          iniciales(nombre),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              nombre,
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'DNI $dni',
+                              style: TextStyle(color: context.textoSuave),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
             ],
-            
+
+            // Se puede cargar y también corregir. Corregir NO registra asistencia:
+            // solo cambia los datos que se van a usar la próxima vez que escanees.
             ElevatedButton.icon(
               onPressed: modalInfo,
-              icon: const Icon(Icons.person),
-              label: Text(
-                nombre.isEmpty ? 'Agregar informacion' : 'Alumno configurado',
+              icon: Icon(
+                nombre.isEmpty ? Icons.person_add_alt : Icons.edit_outlined,
               ),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
+              label: Text(
+                nombre.isEmpty ? 'Agregar información' : 'Editar mis datos',
               ),
             ),
-            
-            const SizedBox(height: 20),
-            
+
+            const SizedBox(height: 12),
+
             ElevatedButton.icon(
               onPressed: nombre.isEmpty || cargando ? null : escanearYValidar,
-              icon: cargando 
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
-                : const Icon(Icons.qr_code_scanner),
-              label: Text(cargando ? 'Verificando ubicacion...' : 'Escanear QR de clase'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.purple,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
+              icon: cargando
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.qr_code_scanner),
+              label: Text(
+                cargando ? 'Verificando ubicación...' : 'Escanear QR de clase',
               ),
             ),
 
             if (claseInfo.isNotEmpty) ...[
-              const SizedBox(height: 40),
-              const Divider(),
-              const SizedBox(height: 20),
+              const SizedBox(height: 32),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  border: Border.all(color: Colors.green),
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppTheme.exito.withAlpha(30),
+                  border: Border.all(color: AppTheme.exito),
+                  borderRadius: BorderRadius.circular(AppTheme.radio),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    const Text('Asistencia Registrada', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.green)),
-                    const SizedBox(height: 10),
-                    Text('Materia: $claseInfo', style: const TextStyle(fontSize: 16)),
-                    Text('Fecha: $fechaInfo', style: const TextStyle(fontSize: 16)),
+                    const Icon(
+                      Icons.check_circle,
+                      color: AppTheme.exito,
+                      size: 36,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Asistencia registrada',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 17,
+                              color: AppTheme.exito,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text('Materia: $claseInfo'),
+                          Text('Fecha: $fechaInfo'),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              )
+              ),
             ]
           ],
         ),

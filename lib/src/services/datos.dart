@@ -121,6 +121,8 @@ class Datos {
       registro: data['registro'] as int,
       dni: data['dni'] as int,
       hora: DateTime.parse(data['hora'] as String),
+      nombreAnterior: data['nombreAnterior'] as String?,
+      dniAnterior: data['dniAnterior'] as int?,
     );
   }
 
@@ -183,16 +185,28 @@ class Datos {
     }).timeout(_espera);
   }
 
-  // Cuando el profesor sale de la pantalla del QR, ya no se puede registrar asistencia.
-  static Future<void> cerrarQr(String claseId) async {
-    try {
-      await _db
-          .collection('clases')
-          .doc(claseId)
-          .set({'qr': ''}, SetOptions(merge: true)).timeout(_espera);
-    } catch (e) {
-      debugPrint('Error al cerrar el QR: $e');
-    }
+  // El QR no se cierra al salir de la pantalla: sigue valiendo hasta que venza
+  // (10 minutos), así el profesor puede cerrar la app y volver sin perderlo.
+  // Esta función devuelve el QR vigente de la clase, o null si no hay o ya venció.
+  static Future<String?> qrVigente(String claseId) async {
+    final doc =
+        await _db.collection('clases').doc(claseId).get().timeout(_espera);
+    final qr = doc.data()?['qr'] as String?;
+    if (qr == null || qr.isEmpty) return null;
+
+    final momento = momentoQr(qr);
+    if (momento == null) return null;
+
+    final edad = DateTime.now().difference(momento);
+    return edad.inSeconds < minutosValidez * 60 ? qr : null;
+  }
+
+  // Momento en que se generó un QR (viene escrito dentro del propio texto del QR)
+  static DateTime? momentoQr(String qr) {
+    final partes = qr.split('|');
+    if (partes.length != 5) return null;
+    final ms = int.tryParse(partes[2]);
+    return ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
   }
 
   // Lo usa el alumno: devuelve los datos de la clase (id, materia, fecha, profesor)
@@ -234,6 +248,9 @@ class Datos {
       'dni': alumno.dni,
       'registro': alumno.registro,
       'hora': alumno.hora.toIso8601String(),
+      // Solo si el alumno cambió sus datos desde la última vez (aviso para el profesor)
+      if (alumno.nombreAnterior != null) 'nombreAnterior': alumno.nombreAnterior,
+      if (alumno.dniAnterior != null) 'dniAnterior': alumno.dniAnterior,
     }).timeout(_espera);
     return true;
   }

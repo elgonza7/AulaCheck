@@ -25,6 +25,18 @@ class Materia {
         clases: (json['clases'] as List).map((c) => Clase.fromJson(c)).toList(),
       );
 
+  // Alumnos que cambiaron sus datos entre una clase y otra (con la clase donde se notó).
+  // Es solo un aviso para el profesor, no bloquea nada.
+  List<({Alumno alumno, Clase clase})> avisosCambioDatos() {
+    final avisos = <({Alumno alumno, Clase clase})>[];
+    for (final clase in clases) {
+      for (final alumno in clase.alumnos) {
+        if (alumno.cambioDatos) avisos.add((alumno: alumno, clase: clase));
+      }
+    }
+    return avisos;
+  }
+
   // Cuenta a cuántas clases fue cada alumno (por DNI) y lo ordena de mayor a menor.
   List<MapEntry<Alumno, int>> rankingAsistencia() {
     final Map<int, Alumno> alumnosPorDni = {};

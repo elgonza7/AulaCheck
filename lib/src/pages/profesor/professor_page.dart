@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:aulacheck/src/models/models.dart';
 import 'package:aulacheck/src/services/datos.dart';
 import 'package:aulacheck/src/pages/profesor/carreras_page.dart';
+import 'package:aulacheck/src/config/app_theme.dart';
 import 'package:aulacheck/src/widgets/layout_base.dart';
 
 class ProfessorPage extends StatefulWidget {
@@ -113,38 +114,52 @@ class _ProfessorPageState extends State<ProfessorPage> {
         children: [
           const Text(
             'Datos del profesor',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 4),
+          Text(
+            'Los completás una sola vez.',
+            style: TextStyle(color: context.textoSuave),
+          ),
+          const SizedBox(height: 24),
           TextField(
             controller: ctrlNombre,
+            textCapitalization: TextCapitalization.words,
             decoration: const InputDecoration(
-                labelText: 'Nombre completo', border: OutlineInputBorder()),
+              labelText: 'Nombre completo',
+              prefixIcon: Icon(Icons.person_outline),
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           TextField(
             controller: ctrlDni,
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(
-                labelText: 'DNI', border: OutlineInputBorder()),
+              labelText: 'DNI',
+              prefixIcon: Icon(Icons.badge_outlined),
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           TextField(
             controller: ctrlCarrera,
+            textCapitalization: TextCapitalization.words,
             decoration: const InputDecoration(
-                labelText: 'Carrera', border: OutlineInputBorder()),
+              labelText: 'Carrera',
+              prefixIcon: Icon(Icons.school_outlined),
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           TextField(
             controller: ctrlMateria,
+            textCapitalization: TextCapitalization.words,
             decoration: const InputDecoration(
-                labelText: 'Materia', border: OutlineInputBorder()),
+              labelText: 'Materia',
+              prefixIcon: Icon(Icons.menu_book_outlined),
+            ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           ElevatedButton(
             onPressed: guardarDatos,
-            style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16)),
             child: const Text('Guardar'),
           ),
         ],
@@ -160,23 +175,58 @@ class _ProfessorPageState extends State<ProfessorPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Card(
-            child: ListTile(
-              leading: const Icon(Icons.school),
-              title: Text(p.nombre),
-              subtitle: Text('DNI: ${p.dni}\n${p.carrera} - ${p.materia}'),
-              isThreeLine: true,
-              trailing: IconButton(
-                icon: const Icon(Icons.edit),
-                onPressed: editarDatos,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: AppTheme.violeta,
+                    child: Text(
+                      iniciales(p.nombre),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          p.nombre,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'DNI ${p.dni}',
+                          style: TextStyle(color: context.textoSuave),
+                        ),
+                        Text(
+                          '${p.carrera} · ${p.materia}',
+                          style: TextStyle(color: context.textoSuave),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined),
+                    tooltip: 'Editar mis datos',
+                    onPressed: editarDatos,
+                  ),
+                ],
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 8),
           ElevatedButton.icon(
-            icon: const Icon(Icons.book),
+            icon: const Icon(Icons.menu_book),
             label: const Text('Ver Mis Carreras y Materias'),
-            style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16)),
             onPressed: () {
               Navigator.push(
                 context,

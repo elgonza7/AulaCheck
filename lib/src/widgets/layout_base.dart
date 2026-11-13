@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
 
+import 'package:aulacheck/src/config/app_theme.dart';
 import 'package:aulacheck/src/pages/settings/settings_page.dart';
+
+// Iniciales para el avatar: "María Pérez" -> "MP"
+String iniciales(String nombre) {
+  final partes = nombre.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+  if (partes.isEmpty) return '?';
+  return partes.take(2).map((p) => p[0].toUpperCase()).join();
+}
 
 PreferredSizeWidget aulaAppBar(
   BuildContext context,
@@ -40,7 +48,6 @@ class LayoutBase extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF101010),
       body: SafeArea(
         child: SizedBox(
           width: double.infinity,
@@ -52,7 +59,7 @@ class LayoutBase extends StatelessWidget {
               Row(
                 children: [
                   const SizedBox(width: 56),
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text.rich(
                         TextSpan(
@@ -60,7 +67,7 @@ class LayoutBase extends StatelessWidget {
                             TextSpan(
                               text: 'AULA',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: Theme.of(context).colorScheme.onSurface,
                                 fontSize: 32,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -79,10 +86,7 @@ class LayoutBase extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(
-                      Icons.settings_outlined,
-                      color: Colors.white,
-                    ),
+                    icon: const Icon(Icons.settings_outlined),
                     tooltip: 'Abrir ajustes',
                     onPressed: () {
                       Navigator.push(
@@ -98,8 +102,8 @@ class LayoutBase extends StatelessWidget {
               if (titulo.isNotEmpty)
                 Text(
                   titulo,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
                   ),
@@ -108,7 +112,7 @@ class LayoutBase extends StatelessWidget {
               if (subtitulo.isNotEmpty)
                 Text(
                   subtitulo,
-                  style: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                  style: TextStyle(color: context.textoSuave, fontSize: 14),
                 ),
               const SizedBox(height: 40),
               Expanded(child: hijo),

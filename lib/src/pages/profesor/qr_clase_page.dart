@@ -7,6 +7,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:aulacheck/src/models/models.dart';
 import 'package:aulacheck/src/services/datos.dart';
 import 'package:aulacheck/src/services/pdf_service.dart';
+import 'package:aulacheck/src/config/app_theme.dart';
+import 'package:aulacheck/src/widgets/estado_vacio.dart';
 import 'package:aulacheck/src/widgets/layout_base.dart';
 
 // Muestra el QR de una clase. Dura 10 minutos y después se puede volver a generar.
@@ -53,12 +55,29 @@ class _QrClasePageState extends State<QrClasePage> {
   void dispose() {
     timer?.cancel();
     suscripcionAsistencias?.cancel();
-    Datos.cerrarQr(widget.clase.id); // al salir, el QR deja de servir
     super.dispose();
   }
 
-  Future<void> inicializarQr() async {
+  // Si el profesor ya generó un QR que todavía no venció (por ejemplo, cerró la app
+  // y volvió a entrar), se reutiliza el mismo con el tiempo que le queda.
+  // Solo se crea uno nuevo si venció o si se pide con "forzarNuevo".
+  Future<void> inicializarQr({bool forzarNuevo = false}) async {
     try {
+      if (!forzarNuevo) {
+        final existente = await Datos.qrVigente(widget.clase.id);
+        if (!mounted) return;
+        if (existente != null) {
+          qrData = existente;
+          vence = Datos.momentoQr(existente)!
+              .add(const Duration(minutes: Datos.minutosValidez));
+          setState(() {
+            cargandoUbicacion = false;
+            errorUbicacion = null;
+          });
+          return;
+        }
+      }
+
       final posicion = await obtenerUbicacion();
       if (!mounted) return;
       qrData = Datos.generarQr(
@@ -106,7 +125,7 @@ class _QrClasePageState extends State<QrClasePage> {
       cargandoUbicacion = true;
       errorUbicacion = null;
     });
-    await inicializarQr();
+    await inicializarQr(forzarNuevo: true);
   }
 
   String tiempoRestante() {
@@ -256,14 +275,36 @@ class _QrClasePageState extends State<QrClasePage> {
             const Text('El QR venció'),
             const SizedBox(height: 8),
             ElevatedButton.icon(
-              onPressed: () => setState(generarNuevoQr),
+              onPressed: generarNuevoQr,
               icon: const Icon(Icons.refresh),
               label: const Text('Generar QR nuevo'),
             ),
           ] else ...[
-            QrImageView(data: qrData, size: 220, backgroundColor: Colors.white),
-            const SizedBox(height: 8),
-            Text('Vence en ${tiempoRestante()}'),
+            // El QR va sobre un marco blanco para que se escanee bien en tema oscuro
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AppTheme.radio),
+              ),
+              child: QrImageView(
+                data: qrData,
+                size: 220,
+                backgroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.timer_outlined, size: 18, color: context.textoSuave),
+                const SizedBox(width: 6),
+                Text(
+                  'Vence en ${tiempoRestante()}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
           ],
           const Divider(height: 32),
           Row(
@@ -296,14 +337,43 @@ class _QrClasePageState extends State<QrClasePage> {
           Expanded(
             child: ListView(
               children: [
+                if (alumnos.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 24),
+                    child: EstadoVacio(
+                      icono: Icons.how_to_reg_outlined,
+                      mensaje: 'Todavía no se registró nadie.\nLos alumnos aparecen acá en cuanto escanean.',
+                    ),
+                  ),
                 for (final alumno in alumnos)
                   ListTile(
-                    leading: const Icon(
-                      Icons.check_circle,
-                      color: Colors.green,
+                    leading: CircleAvatar(
+                      backgroundColor: AppTheme.violeta.withAlpha(60),
+                      child: Text(
+                        iniciales(alumno.nombre),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                     title: Text(alumno.nombre),
-                    subtitle: Text('DNI: ${alumno.dni}'),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('DNI: ${alumno.dni}'),
+                        // Aviso: el alumno cambió sus datos desde la última vez
+                        if (alumno.cambioDatos)
+                          Text(
+                            '⚠ Cambió sus datos (antes: ${alumno.nombreAnterior}, '
+                            'DNI ${alumno.dniAnterior})',
+                            style: const TextStyle(
+                              color: Colors.orange,
+                              fontSize: 12,
+                            ),
+                          ),
+                      ],
+                    ),
                     trailing: PopupMenuButton<String>(
                       onSelected: (accion) {
                         if (accion == 'editar') editarAsistencia(alumno);

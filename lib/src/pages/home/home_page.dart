@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:aulacheck/src/config/app_theme.dart';
 import 'package:aulacheck/src/widgets/layout_base.dart';
 import 'package:aulacheck/src/pages/alumno/alumno_page.dart';
 import 'package:aulacheck/src/pages/profesor/professor_page.dart';
@@ -11,7 +12,7 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBase(
       titulo: 'Bienvenido',
-      subtitulo: 'Como utilizaras AulaCheck',
+      subtitulo: '¿Cómo vas a usar AulaCheck?',
       hijo: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
@@ -20,7 +21,7 @@ class HomePage extends StatelessWidget {
               icono: Icons.school_outlined,
               titulo: 'Soy Profesor',
               descripcion:
-                  'Podra crear Materias, Clases para esas materias y registrar la asistencia',
+                  'Podrás crear carreras, materias y clases, y registrar la asistencia con un QR',
               onTap: () {
                 Navigator.push(
                   context,
@@ -32,7 +33,7 @@ class HomePage extends StatelessWidget {
             OpcionInicio(
               icono: Icons.badge_outlined,
               titulo: 'Soy Alumno',
-              descripcion: 'Tendra acceso al QR de las Clases',
+              descripcion: 'Escaneá el QR de la clase para registrar tu asistencia',
               onTap: () {
                 Navigator.push(
                   context,
@@ -66,7 +67,7 @@ class OpcionInicio extends StatelessWidget {
     const radio = BorderRadius.all(Radius.circular(16));
 
     return Material(
-      color: const Color(0xFF1A1A1A),
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: radio,
       child: InkWell(
         onTap: onTap,
@@ -90,8 +91,8 @@ class OpcionInicio extends StatelessWidget {
                   children: [
                     Text(
                       titulo,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -99,7 +100,7 @@ class OpcionInicio extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       descripcion,
-                      style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                      style: TextStyle(color: context.textoSuave, fontSize: 13),
                     ),
                   ],
                 ),

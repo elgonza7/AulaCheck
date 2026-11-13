@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:aulacheck/src/services/datos.dart';
 import 'package:aulacheck/src/models/models.dart';
 import 'package:aulacheck/src/pages/profesor/materias_page.dart';
+import 'package:aulacheck/src/widgets/estado_vacio.dart';
 import 'package:aulacheck/src/widgets/layout_base.dart';
 
 class CarrerasPage extends StatefulWidget {
@@ -122,15 +123,18 @@ class _CarrerasPageState extends State<CarrerasPage> {
     return Scaffold(
       appBar: aulaAppBar(context, 'Mis carreras'),
       body: carreras.isEmpty
-          ? const Center(child: Text('Todavía no creaste carreras'))
+          ? const EstadoVacio(
+              icono: Icons.school_outlined,
+              mensaje: 'Todavía no creaste carreras.\nTocá "Nueva carrera" para empezar.',
+            )
           : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
               itemCount: carreras.length,
               itemBuilder: (context, i) {
                 final c = carreras[i];
                 return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: ListTile(
-                    leading: const Icon(Icons.school, color: Colors.blue),
+                    leading: const Icon(Icons.school),
                     title: Text(c.nombre),
                     subtitle: Text('${c.materias.length} materias'),
                     trailing: PopupMenuButton<String>(

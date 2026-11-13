@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:aulacheck/src/services/datos.dart';
 import 'package:aulacheck/src/models/models.dart';
 import 'package:aulacheck/src/pages/profesor/page_class.dart';
+import 'package:aulacheck/src/widgets/estado_vacio.dart';
 import 'package:aulacheck/src/widgets/layout_base.dart';
 
 class MateriasPage extends StatefulWidget {
@@ -124,19 +125,21 @@ class _MateriasPageState extends State<MateriasPage> {
     return Scaffold(
       appBar: aulaAppBar(context, widget.carrera.nombre),
       body: materias.isEmpty
-          ? const Center(child: Text('Todavía no creaste materias'))
+          ? const EstadoVacio(
+              icono: Icons.menu_book_outlined,
+              mensaje: 'Esta carrera todavía no tiene materias.\nTocá "Nueva materia" para agregar una.',
+            )
           : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
               itemCount: materias.length,
               itemBuilder: (context, i) {
                 final m = materias[i];
 
                 return Card(
-                  margin:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: ListTile(
                     title: Text(m.nombre),
                     subtitle: Text('${m.clases.length} clases'),
-                    leading: const Icon(Icons.class_, color: Colors.blue),
+                    leading: const Icon(Icons.menu_book),
                     trailing: PopupMenuButton<String>(
                       onSelected: (accion) {
                         if (accion == 'editar') editarMateria(m);

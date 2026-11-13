@@ -3,6 +3,8 @@ import 'package:aulacheck/src/models/models.dart';
 import 'package:aulacheck/src/services/datos.dart';
 import 'package:aulacheck/src/services/pdf_service.dart';
 import 'package:aulacheck/src/pages/profesor/qr_clase_page.dart';
+import 'package:aulacheck/src/config/app_theme.dart';
+import 'package:aulacheck/src/widgets/estado_vacio.dart';
 import 'package:aulacheck/src/widgets/layout_base.dart';
 
 class PageClass extends StatefulWidget {
@@ -15,6 +17,64 @@ class PageClass extends StatefulWidget {
 }
 
 class _PageClassState extends State<PageClass> {
+  @override
+  void initState() {
+    super.initState();
+    refrescar(); // trae de la nube las asistencias que se hayan registrado
+  }
+
+  // Vuelve a leer las asistencias. También se dispara al deslizar la lista
+  // hacia abajo (RefreshIndicator).
+  Future<void> refrescar() async {
+    try {
+      await Datos.sincronizarAsistencias();
+    } catch (_) {
+      // Sin internet: se queda lo que ya estaba cargado
+    }
+    if (mounted) setState(() {});
+  }
+
+  // Avisos: alumnos que cambiaron sus datos entre una clase y otra
+  List<Widget> avisosCambioDatos() {
+    final avisos = widget.materia.avisosCambioDatos();
+    if (avisos.isEmpty) return [];
+
+    return [
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                  SizedBox(width: 8),
+                  Text(
+                    'Avisos',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              for (final aviso in avisos)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text(
+                    '${aviso.alumno.nombre} (DNI ${aviso.alumno.dni}) se registró '
+                    'en ${aviso.clase.nombre} (${aviso.clase.fecha}) con otros datos. '
+                    'Antes: ${aviso.alumno.nombreAnterior}, '
+                    'DNI ${aviso.alumno.dniAnterior}.',
+                    style: TextStyle(color: context.textoSuave),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    ];
+  }
+
   Future<void> editarClase(Clase clase) async {
     final ctrl = TextEditingController(text: clase.nombre);
     final nombre = await showDialog<String>(
@@ -111,24 +171,32 @@ class _PageClassState extends State<PageClass> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: RefreshIndicator(
+        onRefresh: refrescar,
+        child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
         children: [
           resumenAsistencia(),
-          const SizedBox(height: 16),
+          ...avisosCambioDatos(),
+          const SizedBox(height: 8),
           const Text(
             'Clases',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
+          const SizedBox(height: 12),
           if (clases.isEmpty)
             const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: Text('Todavía no hay clases')),
+              padding: EdgeInsets.only(top: 24),
+              child: EstadoVacio(
+                icono: Icons.event_outlined,
+                mensaje: 'Todavía no hay clases.\nTocá "Nueva Clase" para generar el QR de hoy.',
+              ),
             ),
           for (final clase in clases.reversed)
             Card(
               child: ListTile(
-                leading: const Icon(Icons.event, color: Colors.blue),
+                leading: const Icon(Icons.event),
                 title: Text('${clase.nombre} - ${clase.fecha}'),
                 subtitle: Text('${clase.alumnos.length} presentes'),
                 trailing: PopupMenuButton<String>(
@@ -145,6 +213,7 @@ class _PageClassState extends State<PageClass> {
               ),
             ),
         ],
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: nuevaClase,
@@ -159,27 +228,44 @@ class _PageClassState extends State<PageClass> {
     final ranking = widget.materia.rankingAsistencia();
     final totalClases = widget.materia.clases.length;
 
+    // Colores de los trofeos: oro, plata y bronce
+    const medallas = [Color(0xFFFFC107), Color(0xFFB0BEC5), Color(0xFFCD7F32)];
+
     return Card(
-      color: Colors.blue.shade50,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Mayor asistencia',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            const Row(
+              children: [
+                Icon(Icons.emoji_events, color: AppTheme.violeta),
+                SizedBox(width: 8),
+                Text(
+                  'Mayor asistencia',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             if (ranking.isEmpty)
-              const Text('Aún no hay asistencias registradas'),
-            for (final entrada in ranking.take(3))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'Aún no hay asistencias registradas',
+                  style: TextStyle(color: context.textoSuave),
+                ),
+              ),
+            for (final (i, entrada) in ranking.take(3).indexed)
               ListTile(
                 dense: true,
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.emoji_events, color: Colors.amber),
+                leading: Icon(Icons.workspace_premium, color: medallas[i]),
                 title: Text(entrada.key.nombre),
-                trailing: Text('${entrada.value}/$totalClases'),
+                trailing: Text(
+                  '${entrada.value}/$totalClases',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
           ],
         ),
