@@ -5,7 +5,7 @@ import 'package:aulacheck/src/models/models.dart';
 String _hora(DateTime h) =>
     '${h.hour.toString().padLeft(2, '0')}:${h.minute.toString().padLeft(2, '0')}';
 
-// PDF con los presentes de UNA clase, en el orden que se le pase.
+// PDF de UNA clase, en el orden que le paso (llegada o A-Z)
 Future<void> pdfClase(Materia materia, Clase clase, List<Alumno> alumnos) async {
   final doc = pw.Document();
   doc.addPage(
@@ -30,8 +30,8 @@ Future<void> pdfClase(Materia materia, Clase clase, List<Alumno> alumnos) async 
   );
 }
 
-// PDF de toda la materia: alumnos de mayor a menor asistencia
-// y columnas vacías para completar las notas.
+// PDF de la materia: ranking de asistencia
+// + columnas Nota 1, Nota 2 y Final vacías para completar a mano.
 Future<void> pdfMateria(Materia materia) async {
   final ranking = materia.rankingAsistencia();
   final total = materia.clases.length;

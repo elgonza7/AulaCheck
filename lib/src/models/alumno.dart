@@ -2,16 +2,16 @@ class Alumno {
   String nombre;
   int registro;
   int dni;
-  DateTime hora; // cuándo se registró la asistencia
+  DateTime hora; // hora en que escaneó
 
-  // Si el alumno cambió sus datos desde la última vez que registró asistencia,
-  // acá quedan los datos que tenía antes. Sirve para avisarle al profesor.
+  // Datos viejos: solo se llenan si cambió nombre/DNI desde su última asistencia.
+  // Con esto le sale el aviso naranja al profe.
   String? nombreAnterior;
   int? dniAnterior;
 
-  // Foto del alumno (texto base64). Viaja con la asistencia para que el profesor
-  // vea la cara de quien se registró. No se guarda dentro de las materias del
-  // profesor (toJson) para no llenar ese documento.
+  // Foto en base64. Va en la asistencia para que el profe vea quién es.
+  // OJO: no la meto en toJson, si no el documento del profe se llena de fotos
+  // (Firestore tiene límite de 1 MB por documento).
   String? foto;
 
   Alumno({
@@ -26,7 +26,7 @@ class Alumno {
 
   bool get cambioDatos => dniAnterior != null;
 
-  // toJson / fromJson: pasan el objeto a texto para guardarlo y lo reconstruyen al leerlo
+  // toJson = objeto -> Map para guardar / fromJson = al revés, al leer
   Map<String, dynamic> toJson() => {
         'nombre': nombre,
         'registro': registro,

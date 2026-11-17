@@ -1,4 +1,4 @@
-// Un solo import para todos los modelos:
+// Barrel: con este import tengo todos los modelos de una:
 // import 'package:aulacheck/src/models/models.dart';
 export 'alumno.dart';
 export 'carrera.dart';

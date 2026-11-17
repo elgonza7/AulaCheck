@@ -7,12 +7,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:aulacheck/src/models/models.dart';
 
-// Datos compartidos entre pantallas.
-// Se guardan en Firestore (la nube), así el profesor puede cambiar de celular
-// y los alumnos pueden usar el suyo.
+// Todo lo de Firebase está acá (los datos que usan varias pantallas).
+// Lo pasé a la nube para que el profe pueda cambiar de celu sin perder nada,
+// y cada alumno usa el suyo.
 //
-// El profesor inicia sesión con email y contraseña (Firebase Authentication).
-// Cada profesor tiene un "uid": un identificador único que le da Firebase.
+// Login del profe: email + contraseña (Firebase Authentication).
+// uid = el id único que Firebase le da a cada profe.
 //
 // Colecciones de Firestore:
 //   profesores/{uid}            -> perfil del profesor + árbol de carreras, materias y clases
@@ -22,13 +22,13 @@ class Datos {
   static Profesor? profesor;
   static final List<Carrera> carreras = [];
 
-  // Ajustes del QR (se cambian en la pantalla de Ajustes)
-  static int minutosQr = 10; // cuánto dura un QR activo
-  static int radioMetros = 100; // a qué distancia del profesor tiene que estar el alumno
+  // ajustes del QR (pantalla Ajustes)
+  static int minutosQr = 10; // cuánto dura el QR
+  static int radioMetros = 100; // radio en metros alrededor del profe
 
   static const String claveAsistenciaDispositivo = 'asistencia_dispositivo_';
 
-  // Evita pisar lo guardado en la nube con una lista vacía si todavía no se pudo leer
+  // para no pisar la nube con una lista vacía si todavía no se leyó nada
   static bool _cargado = false;
 
   static const Duration _espera = Duration(seconds: 8);
@@ -36,7 +36,7 @@ class Datos {
   static FirebaseFirestore get _db => FirebaseFirestore.instance;
   static FirebaseAuth get _auth => FirebaseAuth.instance;
 
-  // Identificador del profesor que inició sesión (null si no hay nadie)
+  // uid del profe logueado (null = nadie)
   static String? get _uid => _auth.currentUser?.uid;
 
   static DocumentReference<Map<String, dynamic>> _docProfesor(String uid) =>
@@ -44,7 +44,7 @@ class Datos {
 
   // ----------------------------------------------------------- Sesión
 
-  // Crea la cuenta del profesor y guarda su perfil en la nube
+  // registro: crea la cuenta en Auth y el perfil en Firestore
   static Future<void> registrarProfesor({
     required String nombre,
     required String dni,
@@ -76,7 +76,7 @@ class Datos {
     _cargado = false;
   }
 
-  // Cambia nombre y DNI del profesor (el email no se toca)
+  // editar perfil: nombre y DNI (el email no)
   static Future<void> actualizarPerfil(String nombre, String dni) async {
     final uid = _uid;
     if (uid == null || profesor == null) return;
@@ -87,7 +87,7 @@ class Datos {
     profesor!.dni = dni;
   }
 
-  // Traduce los errores de Firebase a mensajes entendibles
+  // errores de Firebase -> mensajes en castellano
   static String mensajeError(Object e) {
     if (e is FirebaseAuthException) {
       switch (e.code) {
@@ -113,8 +113,8 @@ class Datos {
 
   // ----------------------------------------------------------- Guardar y leer
 
-  // Guarda todas las carreras (con sus materias y clases) en la nube.
-  // Hay que llamarla cada vez que se cambia algo.
+  // Sube todas las carreras (con materias y clases) a la nube.
+  // OJO: llamarla cada vez que cambio algo, si no, no se guarda.
   static Future<void> guardar() async {
     final uid = _uid;
     if (uid == null) return;
@@ -133,8 +133,8 @@ class Datos {
     }
   }
 
-  // Lee el perfil y los datos del profesor que inició sesión.
-  // Se llama al abrir la app (main.dart) y al iniciar sesión.
+  // Trae el perfil y los datos del profe logueado.
+  // Se llama en main() y cuando inicia sesión.
   static Future<void> cargar() async {
     final uid = _uid;
     if (uid == null) return;
@@ -162,7 +162,7 @@ class Datos {
     }
   }
 
-  // Actualiza la lista de presentes de cada clase con lo que hay en la nube.
+  // rellena los presentes de cada clase con lo que hay en asistencias
   static Future<void> sincronizarAsistencias() async {
     final uid = _uid;
     if (uid == null) return;
@@ -220,7 +220,7 @@ class Datos {
 
   // ----------------------------------------------------------- Dispositivo del alumno
 
-  // Cada dispositivo puede registrar una sola asistencia por clase.
+  // un celu = una asistencia por clase (candado en SharedPreferences)
   static Future<bool> dispositivoYaRegistro(String claseId) async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool('$claveAsistenciaDispositivo$claseId') ?? false;
@@ -238,7 +238,7 @@ class Datos {
 
   // ---------------------------------------------------------------- QR
 
-  // Texto que se guarda dentro del QR: aulacheck|idClase|momento|latitud|longitud
+  // formato del QR: aulacheck|idClase|momento|latitud|longitud (separado con |)
   static String generarQr(Clase clase, double latitud, double longitud) {
     return 'aulacheck|${clase.id}|${DateTime.now().millisecondsSinceEpoch}|$latitud|$longitud';
   }
@@ -256,7 +256,7 @@ class Datos {
     return (latitud: latitud, longitud: longitud);
   }
 
-  // Momento en que se generó un QR (viene escrito dentro del propio texto del QR)
+  // saco el momento del propio texto del QR (partes[2])
   static DateTime? momentoQr(String qr) {
     final partes = qr.split('|');
     if (partes.length != 5) return null;
@@ -264,8 +264,8 @@ class Datos {
     return ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
   }
 
-  // El profesor activa el QR: queda publicado en la nube junto con su duración
-  // y la distancia máxima permitida. Si había otro, el anterior deja de servir.
+  // Activar: subo el QR a clases/{id} con los minutos y el radio.
+  // Si había otro, el viejo ya no coincide y deja de servir.
   static Future<void> publicarQr(Clase clase, String qr) async {
     await _db.collection('clases').doc(clase.id).set({
       'qr': qr,
@@ -277,7 +277,7 @@ class Datos {
     }).timeout(_espera);
   }
 
-  // El profesor desactiva el QR: desde ese momento nadie más puede registrarse
+  // desactivar: pongo qr = '' y listo, nadie más se registra
   static Future<void> desactivarQr(String claseId) async {
     await _db
         .collection('clases')
@@ -286,8 +286,8 @@ class Datos {
         .timeout(_espera);
   }
 
-  // Cuándo vence un QR activo, o null si no hay QR activo (o ya venció).
-  // Se usa al abrir la pantalla de la clase para mostrar el mismo QR que estaba.
+  // Cuándo vence el QR activo (null = no hay o ya venció).
+  // Lo uso al reabrir la clase para mostrar el mismo QR.
   static Future<({String qr, DateTime vence})?> qrActivo(String claseId) async {
     final doc =
         await _db.collection('clases').doc(claseId).get().timeout(_espera);
@@ -304,8 +304,8 @@ class Datos {
     return (qr: qr, vence: vence);
   }
 
-  // Lo usa el alumno: devuelve los datos de la clase (id, materia, fecha,
-  // profesor, radio) si el QR es el activo y no venció, o null si no sirve.
+  // Lo usa el alumno: si el QR es el activo y no venció devuelve los datos
+  // de la clase (id, materia, fecha, profesor, radio). Si no, null.
   static Future<Map<String, dynamic>?> validarQr(String codigo) async {
     final partes = codigo.split('|');
     if (partes.length != 5 || partes[0] != 'aulacheck') return null;
@@ -326,8 +326,8 @@ class Datos {
 
   // ------------------------------------------------------- Asistencias
 
-  // El alumno registra su asistencia. Devuelve false si ya estaba registrado.
-  // El documento se llama idClase_dni, así no se puede registrar dos veces.
+  // Registra la asistencia. false = ya estaba.
+  // El doc se llama idClase_dni -> el mismo DNI no puede estar dos veces.
   static Future<bool> registrarAsistenciaRemota(
     Map<String, dynamic> clase,
     Alumno alumno,
@@ -343,7 +343,7 @@ class Datos {
       'dni': alumno.dni,
       'registro': alumno.registro,
       'hora': alumno.hora.toIso8601String(),
-      // Solo si el alumno cambió sus datos desde la última vez (aviso para el profesor)
+      // solo si cambió datos (aviso para el profe)
       if (alumno.nombreAnterior != null) 'nombreAnterior': alumno.nombreAnterior,
       if (alumno.dniAnterior != null) 'dniAnterior': alumno.dniAnterior,
       if (alumno.foto != null) 'foto': alumno.foto,
@@ -351,7 +351,7 @@ class Datos {
     return true;
   }
 
-  // El profesor ve en vivo quiénes están presentes en una clase.
+  // Stream: el profe ve en vivo quién va llegando.
   static Stream<List<Alumno>> escucharAsistencias(String claseId) {
     return _db
         .collection('asistencias')
@@ -376,7 +376,7 @@ class Datos {
     }
   }
 
-  // Corrige nombre o DNI de un alumno. Si cambió el DNI cambia el nombre del documento.
+  // corregir nombre/DNI. Si cambia el DNI cambia el id del doc (borro el viejo)
   static Future<void> actualizarAsistenciaRemota(
     String claseId,
     int dniAnterior,

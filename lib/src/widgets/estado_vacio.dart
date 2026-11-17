@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:aulacheck/src/config/app_theme.dart';
 
-// Se muestra cuando una lista todavía no tiene nada (sin carreras, sin clases...).
+// Lo que se ve cuando una lista está vacía (sin carreras, sin clases...).
 class EstadoVacio extends StatelessWidget {
   final IconData icono;
   final String mensaje;

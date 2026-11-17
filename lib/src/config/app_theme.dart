@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-// Todos los colores y estilos de la app en un solo lugar.
-// Hay dos temas (oscuro y claro) que se construyen con la misma función,
-// solo cambian los colores. Si querés cambiar el look, casi siempre alcanza
-// con tocar este archivo.
+// Acá están todos los colores y estilos de la app.
+// Los dos temas salen de la misma función (_construir), solo cambia la paleta.
+// Si quiero cambiar cómo se ve algo, primero me fijo acá.
+// (el claro todavía hay que pulirlo, queda para el final)
 class AppTheme {
   static const Color violeta = Color(0xFF8A2BE2);
   static const Color exito = Color(0xFF4CAF50);
@@ -15,7 +15,7 @@ class AppTheme {
   static ThemeData _construir(Brightness brillo) {
     final esOscuro = brillo == Brightness.dark;
 
-    // Paleta: lo único que cambia entre un tema y otro
+    // Paleta: esto es lo único que cambia entre oscuro y claro
     final fondo = esOscuro ? const Color(0xFF101010) : const Color(0xFFF5F3FA);
     final tarjeta = esOscuro ? const Color(0xFF1A1A1A) : Colors.white;
     final borde = esOscuro ? const Color(0xFF2E2E2E) : const Color(0xFFDDD8EA);
@@ -145,8 +145,8 @@ class AppTheme {
   }
 }
 
-// Atajo para usar desde cualquier pantalla: context.textoSuave
-// Es el gris que se usa para textos secundarios (sirve en tema claro y oscuro).
+// context.textoSuave -> el gris para textos secundarios
+// (extensión para no escribir Theme.of(context)... cada vez, anda en los dos temas)
 extension TemaContexto on BuildContext {
   Color get textoSuave => Theme.of(this).colorScheme.onSurfaceVariant;
 }

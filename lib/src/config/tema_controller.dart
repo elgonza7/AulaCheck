@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// Guarda qué tema eligió el usuario (claro u oscuro) y avisa a la app cuando cambia.
+// Guarda si elegí tema claro u oscuro (SharedPreferences, clave tema_oscuro).
 //
-// "modo" es un ValueNotifier: una variable que avisa a quien la escucha cuando
-// cambia su valor. La app (app.dart) la escucha y se redibuja sola.
+// modo es un ValueNotifier = una variable que avisa cuando cambia.
+// app.dart la escucha con ValueListenableBuilder y se redibuja sola, sin setState.
 class TemaController {
   static final ValueNotifier<ThemeMode> modo = ValueNotifier(ThemeMode.dark);
 
-  // Se llama una vez al abrir la app para recuperar la elección guardada
+  // Lo llamo en main() antes de runApp
   static Future<void> cargar() async {
     final prefs = await SharedPreferences.getInstance();
     final oscuro = prefs.getBool('tema_oscuro') ?? true;

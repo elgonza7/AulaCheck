@@ -1,6 +1,6 @@
 import 'materia.dart';
 
-// Una carrera tiene varias materias, y cada materia varias clases.
+// Carrera -> materias -> clases (así está armado el árbol del profe)
 class Carrera {
   String nombre;
   List<Materia> materias;

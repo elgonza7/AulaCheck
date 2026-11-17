@@ -54,8 +54,8 @@ class LayoutBase extends StatelessWidget {
           child: Column(
             children: [
               const SizedBox(height: 20),
-              // El hueco de la izquierda mide lo mismo que el botón de ajustes
-              // de la derecha (48 + 8), así el título queda realmente centrado.
+              // hueco a la izquierda del mismo ancho que el botón de ajustes (48 + 8)
+              // -> así el título queda centrado de verdad (antes se veía corrido)
               Row(
                 children: [
                   const SizedBox(width: 56),

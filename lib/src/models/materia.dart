@@ -6,7 +6,7 @@ class Materia {
   String nombre;
   String id;
   List<Clase> clases;
-  List<Inscripto> inscriptos; // padrón de alumnos de la materia
+  List<Inscripto> inscriptos; // el padrón
 
   Materia({
     required this.nombre,
@@ -28,22 +28,22 @@ class Materia {
         id: json['id'],
         nombre: json['nombre'],
         clases: (json['clases'] as List).map((c) => Clase.fromJson(c)).toList(),
-        // "?? []" porque las materias guardadas antes no tenían padrón
+        // ?? [] porque las materias viejas no tienen padrón (si no, viene null)
         inscriptos: (json['inscriptos'] as List? ?? [])
             .map((i) => Inscripto.fromJson(i))
             .toList(),
       );
 
-  // Busca un alumno del padrón por DNI (null si no está inscripto)
+  // busco en el padrón por DNI (null = no está inscripto)
   Inscripto? inscriptoPorDni(int dni) =>
       inscriptos.where((i) => i.dni == dni).firstOrNull;
 
-  // A cuántas clases fue un alumno
+  // a cuántas clases fue un alumno
   int asistenciasDe(int dni) =>
       clases.where((c) => c.alumnos.any((a) => a.dni == dni)).length;
 
-  // Alumnos que se registraron con un nombre distinto al del padrón
-  // (mismo DNI, otro nombre). Puede ser un error o alguien cambiando datos.
+  // Mismo DNI que el padrón pero otro nombre.
+  // Puede ser un error de tipeo o alguien haciéndose pasar -> aviso.
   List<({Alumno alumno, Clase clase, Inscripto inscripto})> nombresDistintos() {
     final lista = <({Alumno alumno, Clase clase, Inscripto inscripto})>[];
     for (final clase in clases) {
@@ -58,7 +58,7 @@ class Materia {
     return lista;
   }
 
-  // Alumnos que registraron asistencia pero no están en el padrón (uno por DNI)
+  // escanearon pero no están en el padrón (uno por DNI)
   List<Alumno> registradosSinInscribir() {
     final porDni = <int, Alumno>{};
     for (final clase in clases) {
@@ -69,8 +69,8 @@ class Materia {
     return porDni.values.toList();
   }
 
-  // Alumnos que cambiaron sus datos entre una clase y otra (con la clase donde se notó).
-  // Es solo un aviso para el profesor, no bloquea nada.
+  // Los que cambiaron sus datos entre clases (y en qué clase se vio).
+  // Solo avisa, no bloquea a nadie.
   List<({Alumno alumno, Clase clase})> avisosCambioDatos() {
     final avisos = <({Alumno alumno, Clase clase})>[];
     for (final clase in clases) {
@@ -81,7 +81,7 @@ class Materia {
     return avisos;
   }
 
-  // Cuenta a cuántas clases fue cada alumno (por DNI) y lo ordena de mayor a menor.
+  // Ranking: cuántas clases fue cada uno (por DNI), de mayor a menor
   List<MapEntry<Alumno, int>> rankingAsistencia() {
     final Map<int, Alumno> alumnosPorDni = {};
     final Map<int, int> asistencias = {};

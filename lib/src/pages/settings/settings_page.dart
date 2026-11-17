@@ -12,7 +12,7 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  // Opciones de los desplegables (Dropdown)
+  // opciones de los Dropdown
   final List<int> opcionesMinutos = [5, 10, 15, 20];
   final List<int> opcionesRadio = [50, 100, 200, 500];
 
@@ -46,7 +46,7 @@ class _SettingsPageState extends State<SettingsPage> {
         children: [
           titulo('Apariencia'),
           Card(
-            // Se redibuja solo cuando cambia el tema
+            // se redibuja solo cuando cambia el tema
             child: ValueListenableBuilder<ThemeMode>(
               valueListenable: TemaController.modo,
               builder: (context, modo, _) {
@@ -108,7 +108,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
 
-          // La cuenta solo aparece si hay un profesor con la sesión iniciada
+          // Cuenta: solo si hay un profe logueado
           if (profesor != null) ...[
             titulo('Cuenta'),
             Card(

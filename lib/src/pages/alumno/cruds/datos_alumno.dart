@@ -7,14 +7,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:aulacheck/src/config/app_theme.dart';
 import 'package:aulacheck/src/widgets/avatar_alumno.dart';
 
-// CRUD de los datos del alumno. Se guardan en el celular (SharedPreferences):
+// CRUD del alumno, guardado en el celu con SharedPreferences:
 //   Leer:          DatosAlumno.cargar()
 //   Crear/Editar:  FormularioAlumno (nombre, DNI y foto) -> DatosAlumno.guardar()
 //   Borrar:        DatosAlumno.borrar()
 class DatosAlumno {
   String nombre;
   String dni;
-  String? foto; // base64, null si no sacó ninguna
+  String? foto; // base64, null si no sacó
 
   DatosAlumno({required this.nombre, required this.dni, this.foto});
 
@@ -36,8 +36,8 @@ class DatosAlumno {
     if (foto != null) await prefs.setString('foto', foto!);
   }
 
-  // Borra los datos del alumno de este celular.
-  // No borra las asistencias ya registradas ni el "candado" de una por clase.
+  // Borra los datos del alumno del celu.
+  // OJO: no borra asistencias ni el candado de una por clase (si no, sería re fácil hacer trampa)
   static Future<void> borrar() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('nombre');
@@ -46,7 +46,7 @@ class DatosAlumno {
   }
 }
 
-// Abre el formulario. Devuelve true si se guardó o se borró algo.
+// Abre el formulario. true = guardó o borró algo
 Future<bool> abrirFormularioAlumno(
   BuildContext context,
   DatosAlumno actual,
@@ -84,13 +84,13 @@ class _FormularioAlumnoState extends State<FormularioAlumno> {
     super.dispose();
   }
 
-  // Abre la cámara (o la galería) y devuelve la foto achicada en base64.
-  // Se achica a 300 px para que pese poco (unos 20-30 KB) y entre en Firestore.
+  // Saca foto (o de galería) y la devuelve en base64.
+  // La achico a 300 px para que pese ~20-30 KB y entre en Firestore.
   Future<void> elegirFoto(ImageSource origen) async {
     try {
       final imagen = await ImagePicker().pickImage(
         source: origen,
-        preferredCameraDevice: CameraDevice.front, // cámara de selfie
+        preferredCameraDevice: CameraDevice.front, // la de selfie
         maxWidth: 300,
         maxHeight: 300,
         imageQuality: 60,
@@ -111,7 +111,7 @@ class _FormularioAlumnoState extends State<FormularioAlumno> {
       setState(() => error = 'Completá el nombre y el DNI');
       return;
     }
-    // El DNI se guarda como número en la asistencia, así que tiene que serlo
+    // el DNI va como número en la asistencia, así que valido que lo sea
     if (int.tryParse(dni) == null) {
       setState(() => error = 'El DNI tiene que ser un número');
       return;

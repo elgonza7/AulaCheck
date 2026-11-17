@@ -7,13 +7,13 @@ import 'package:aulacheck/src/widgets/avatar_alumno.dart';
 import 'package:aulacheck/src/widgets/estado_vacio.dart';
 import 'package:aulacheck/src/widgets/layout_base.dart';
 
-// Padrón de alumnos de una materia (CRUD):
+// Padrón de la materia (CRUD):
 //   - Crear: agregar un alumno con nombre y DNI
 //   - Leer: lista con el porcentaje de asistencia de cada uno
 //   - Editar: corregir nombre o DNI
 //   - Borrar: sacarlo del padrón
-// Además avisa si un alumno se registró con otros datos.
-// Se guarda en la nube junto con la materia (Datos.guardar).
+// También marca si alguien se registró con otros datos.
+// Se guarda junto con la materia con Datos.guardar().
 class AlumnosMateriaPage extends StatefulWidget {
   final Materia materia;
 
@@ -30,7 +30,7 @@ class _AlumnosMateriaPageState extends State<AlumnosMateriaPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
   }
 
-  // Formulario para crear o editar. Devuelve null si se canceló.
+  // mismo form para crear y editar. null = canceló
   Future<({String nombre, int dni})?> formulario({
     required String titulo,
     String nombre = '',
@@ -69,7 +69,7 @@ class _AlumnosMateriaPageState extends State<AlumnosMateriaPage> {
             onPressed: () {
               final n = ctrlNombre.text.trim();
               final d = int.tryParse(ctrlDni.text.trim());
-              if (n.isEmpty || d == null) return; // no se cierra si falta algo
+              if (n.isEmpty || d == null) return; // si falta algo no cierra
               Navigator.pop(ctx, (nombre: n, dni: d));
             },
             child: const Text('Guardar'),
@@ -149,7 +149,7 @@ class _AlumnosMateriaPageState extends State<AlumnosMateriaPage> {
     await Datos.guardar();
   }
 
-  // Foto del alumno: la de su última asistencia que tenga foto
+  // foto: agarro la de su última asistencia que tenga
   String? fotoDe(int dni) {
     for (final clase in materia.clases.reversed) {
       for (final a in clase.alumnos) {
@@ -159,8 +159,8 @@ class _AlumnosMateriaPageState extends State<AlumnosMateriaPage> {
     return null;
   }
 
-  // Avisos de un alumno del padrón: si alguna vez se registró con otro nombre
-  // o cambió sus datos desde la app.
+  // avisos de un alumno: si alguna vez puso otro nombre
+  // o si cambió sus datos desde la app.
   List<String> avisosDe(Inscripto ins) {
     final avisos = <String>[];
     for (final clase in materia.clases) {
@@ -207,7 +207,7 @@ class _AlumnosMateriaPageState extends State<AlumnosMateriaPage> {
             ),
           for (final ins in inscriptos) tarjetaInscripto(ins, total),
 
-          // Alumnos que escanearon el QR pero no están en el padrón
+          // escanearon pero no están en el padrón (botón para agregarlos)
           if (sinInscribir.isNotEmpty) ...[
             const SizedBox(height: 16),
             const Row(
@@ -249,7 +249,7 @@ class _AlumnosMateriaPageState extends State<AlumnosMateriaPage> {
     final fue = materia.asistenciasDe(ins.dni);
     final porcentaje = total == 0 ? 0 : (fue * 100 / total).round();
     final avisos = avisosDe(ins);
-    // Verde 75% o más, naranja 50-74%, rojo menos de 50%
+    // verde >= 75%, naranja 50-74%, rojo < 50%
     final color = porcentaje >= 75
         ? AppTheme.exito
         : porcentaje >= 50

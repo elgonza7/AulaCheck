@@ -9,7 +9,7 @@ class AulaCheckApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Cuando el usuario cambia el tema en Ajustes, este builder se ejecuta de nuevo
+    // Escucha TemaController.modo: si cambio el tema en Ajustes se redibuja toda la app
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: TemaController.modo,
       builder: (context, modo, _) {

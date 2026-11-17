@@ -4,7 +4,7 @@ class Clase {
   String id;
   String nombre;
   String materia;
-  List<Alumno> alumnos; // alumnos que estuvieron presentes
+  List<Alumno> alumnos; // los presentes
   DateTime fechaCreacion;
 
   Clase({
@@ -34,7 +34,7 @@ class Clase {
             .toList(),
       );
 
-  // Fecha con formato 21/09/2026
+  // para mostrar tipo 21/09/2026
   String get fecha => formatoFecha(fechaCreacion);
 
   static String formatoFecha(DateTime dia) {
@@ -43,10 +43,10 @@ class Clase {
     return '$d/$m/${dia.year}';
   }
 
-  // Una clase es de un solo día: el QR solo se puede activar ese día
+  // Una clase = un día. Si no es de hoy, no deja activar el QR
   bool get esDeHoy => fecha == formatoFecha(DateTime.now());
 
-  // Devuelve false si el alumno ya estaba registrado en esta clase
+  // false si ese alumno ya estaba (no lo duplica)
   bool registrarAsistencia(Alumno alumno) {
     final yaEsta = alumnos.any((a) => a.dni == alumno.dni);
     if (yaEsta) return false;

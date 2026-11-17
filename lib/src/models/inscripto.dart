@@ -1,5 +1,5 @@
-// Un alumno del padrón de una materia (la lista oficial de inscriptos que carga el profesor).
-// No es lo mismo que Alumno: Alumno es una asistencia (alguien que escaneó un QR).
+// Inscripto = un alumno del padrón (la lista que carga el profe).
+// No confundir con Alumno: Alumno es una asistencia (alguien que escaneó).
 class Inscripto {
   String nombre;
   int dni;

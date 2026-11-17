@@ -19,7 +19,7 @@ class AlumnoPage extends StatefulWidget {
 class _AlumnoPageState extends State<AlumnoPage> {
   String nombre = "";
   String dni = "";
-  String? foto; // foto del alumno en base64 (null si no sacó ninguna)
+  String? foto; // foto en base64 (null = no sacó)
   String claseInfo = "";
   String fechaInfo = "";
   bool cargando = false;
@@ -30,7 +30,7 @@ class _AlumnoPageState extends State<AlumnoPage> {
     cargarDatos();
   }
 
-  // Fecha de hoy como texto, para saber si la última asistencia fue hoy
+  // hoy como texto, para comparar con la última asistencia
   String diaDeHoy() {
     final ahora = DateTime.now();
     return '${ahora.year}-${ahora.month}-${ahora.day}';
@@ -40,7 +40,7 @@ class _AlumnoPageState extends State<AlumnoPage> {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
 
-    // El aviso de "asistencia registrada" se muestra durante todo el día
+    // el cartel de "asistencia registrada" dura todo el día (antes se borraba)
     final registradoHoy = prefs.getString('ultima_dia') == diaDeHoy();
 
     setState(() {
@@ -54,13 +54,13 @@ class _AlumnoPageState extends State<AlumnoPage> {
     });
   }
 
-  // Abre el CRUD de los datos del alumno (alumno/cruds/datos_alumno.dart)
+  // abre el CRUD del alumno (cruds/datos_alumno.dart)
   Future<void> modalInfo() async {
     final cambio = await abrirFormularioAlumno(
       context,
       DatosAlumno(nombre: nombre, dni: dni, foto: foto),
     );
-    if (cambio) cargarDatos(); // se vuelven a leer los datos guardados
+    if (cambio) cargarDatos(); // si guardó algo, releo
   }
 
   Future<void> escanearYValidar() async {
@@ -112,7 +112,7 @@ class _AlumnoPageState extends State<AlumnoPage> {
         return;
       }
 
-      // El QR se valida contra la nube: tiene que ser el que el profesor tiene activo
+      // Control 1 y 2: que sea el QR activo en la nube y que no haya vencido
       final clase = await Datos.validarQr(codigo);
       if (!mounted) return;
       if (clase == null) {
@@ -120,7 +120,7 @@ class _AlumnoPageState extends State<AlumnoPage> {
         return;
       }
 
-      // La distancia máxima la elige el profesor en Ajustes y viene con la clase
+      // Control 3: distancia. El radio lo elige el profe en Ajustes y viene con la clase
       final radio = (clase['radio'] as int? ?? 100).toDouble();
       final dist = Geolocator.distanceBetween(
         pos.latitude,
@@ -145,8 +145,8 @@ class _AlumnoPageState extends State<AlumnoPage> {
 
       final dniNumero = int.tryParse(dni) ?? 0;
 
-      // ¿Cambió sus datos desde la última asistencia que registró?
-      // Si es así, se guardan los datos anteriores para avisarle al profesor.
+      // Control de cambio: ¿se registró antes con otro nombre/DNI?
+      // Si es así mando también los datos viejos -> aviso naranja al profe.
       final prefs = await SharedPreferences.getInstance();
       final regNombre = prefs.getString('reg_nombre');
       final regDni = int.tryParse(prefs.getString('reg_dni') ?? '');
@@ -160,7 +160,7 @@ class _AlumnoPageState extends State<AlumnoPage> {
           dni: dniNumero,
           nombreAnterior: cambio ? regNombre : null,
           dniAnterior: cambio ? regDni : null,
-          foto: foto, // el profesor ve la foto en la lista de presentes
+          foto: foto, // para que el profe vea la cara en la lista
         ),
       );
       if (!mounted) return;
@@ -170,8 +170,8 @@ class _AlumnoPageState extends State<AlumnoPage> {
       }
       await Datos.guardarAsistenciaDispositivo(claseId);
 
-      // Se recuerdan los datos con los que se registró y el aviso de "asistencia
-      // registrada", para que siga apareciendo aunque se salga de la pantalla.
+      // Guardo con qué datos se registró (para el próximo control de cambio)
+      // y el cartel de registrada, así sigue aunque salga de la pantalla.
       await prefs.setString('reg_nombre', nombre);
       await prefs.setString('reg_dni', dni);
       await prefs.setString('ultima_dia', diaDeHoy());
@@ -237,8 +237,8 @@ class _AlumnoPageState extends State<AlumnoPage> {
               const SizedBox(height: 8),
             ],
 
-            // Se puede cargar y también corregir. Corregir NO registra asistencia:
-            // solo cambia los datos que se van a usar la próxima vez que escanees.
+            // Cargar o corregir datos. Corregir NO toma asistencia,
+            // solo cambia lo que se manda la próxima vez que escanee.
             ElevatedButton.icon(
               onPressed: modalInfo,
               icon: Icon(

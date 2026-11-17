@@ -12,13 +12,13 @@ import 'package:aulacheck/src/widgets/estado_vacio.dart';
 import 'package:aulacheck/src/widgets/avatar_alumno.dart';
 import 'package:aulacheck/src/widgets/layout_base.dart';
 
-// Pantalla de una clase (un día). El QR NO se genera solo al entrar:
-// el profesor lo activa con el botón de arriba y lo puede desactivar cuando quiera.
-// Si se pasa el tiempo (Ajustes) vence solo. Solo se puede activar el día de la clase.
+// Pantalla de una clase (un día). El QR NO se genera solo al entrar,
+// se activa/desactiva con el botón de arriba (al lado del PDF).
+// Vence solo con los minutos de Ajustes, y solo se activa el día de la clase.
 class QrClasePage extends StatefulWidget {
   final Materia materia;
   final Clase clase;
-  final bool activarAlAbrir; // true cuando la clase se acaba de crear
+  final bool activarAlAbrir; // true si la acabo de crear
 
   const QrClasePage({
     super.key,
@@ -35,11 +35,11 @@ class _QrClasePageState extends State<QrClasePage> {
   String? qrData; // null = no hay QR activo
   DateTime? vence;
   bool ordenAlfabetico = false;
-  bool cargando = true; // leyendo de la nube o pidiendo el GPS
+  bool cargando = true; // esperando la nube o el GPS
   Timer? timer;
   StreamSubscription<List<Alumno>>? suscripcionAsistencias;
 
-  // El QR está activo si existe y todavía no venció
+  // activo = existe y no venció
   bool get activo =>
       qrData != null && vence != null && DateTime.now().isBefore(vence!);
 
@@ -48,14 +48,14 @@ class _QrClasePageState extends State<QrClasePage> {
     super.initState();
     cargarQrActivo();
 
-    // Escucha en la nube a los alumnos que van registrando su asistencia
+    // Stream: me avisa cada vez que alguien registra (no es Future, avisa muchas veces)
     suscripcionAsistencias =
         Datos.escucharAsistencias(widget.clase.id).listen((presentes) {
       if (!mounted) return;
       setState(() => widget.clase.alumnos = presentes);
     });
 
-    // Cada segundo se actualiza el contador y la lista de presentes
+    // Timer cada 1 seg: actualiza el contador (y la lista)
     timer = Timer.periodic(const Duration(seconds: 1), (_) {
       setState(() {});
     });
@@ -72,8 +72,8 @@ class _QrClasePageState extends State<QrClasePage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
   }
 
-  // Al entrar: si ya había un QR activo (por ejemplo, cerraste la app y volviste),
-  // se muestra el mismo con el tiempo que le queda. Si no, queda desactivado.
+  // al entrar: si ya había QR activo (ej: cerré la app y volví) muestro ese
+  // con el tiempo que le queda. Si no, queda desactivado.
   Future<void> cargarQrActivo() async {
     try {
       final existente = await Datos.qrActivo(widget.clase.id);
@@ -81,16 +81,16 @@ class _QrClasePageState extends State<QrClasePage> {
       qrData = existente?.qr;
       vence = existente?.vence;
     } catch (_) {
-      // Sin conexión: se muestra como desactivado
+      // sin internet: lo muestro desactivado
     }
     if (!mounted) return;
     setState(() => cargando = false);
 
-    // Clase recién creada: se activa sola la primera vez
+    // clase nueva: se activa sola la primera vez
     if (widget.activarAlAbrir && !activo) activarQr();
   }
 
-  // Crea un QR nuevo con la ubicación del profesor y lo publica en la nube
+  // QR nuevo con mi GPS y lo subo a la nube (el viejo deja de servir)
   Future<void> activarQr() async {
     if (!widget.clase.esDeHoy) {
       mostrarMensaje('Solo se puede activar el QR el día de la clase');
@@ -113,7 +113,7 @@ class _QrClasePageState extends State<QrClasePage> {
     if (mounted) setState(() => cargando = false);
   }
 
-  // Borra el QR de la nube: desde ahora nadie más puede registrarse
+  // borro el QR de la nube: ya nadie más se puede registrar
   Future<void> desactivarQr() async {
     setState(() => cargando = true);
     try {
@@ -145,7 +145,7 @@ class _QrClasePageState extends State<QrClasePage> {
     );
   }
 
-  // Avisa si el alumno no está en el padrón o figura con otro nombre
+  // aviso si no está en el padrón o está con otro nombre
   List<Widget> avisoPadron(Alumno alumno) {
     const estilo = TextStyle(color: Colors.orange, fontSize: 12);
     final ins = widget.materia.inscriptoPorDni(alumno.dni);
@@ -165,7 +165,7 @@ class _QrClasePageState extends State<QrClasePage> {
     return '$min:$seg';
   }
 
-  // Lista de presentes en el orden elegido
+  // presentes en el orden que elegí
   List<Alumno> alumnosOrdenados() {
     final lista = List<Alumno>.from(widget.clase.alumnos); // orden de llegada
     if (ordenAlfabetico) {
@@ -258,7 +258,7 @@ class _QrClasePageState extends State<QrClasePage> {
         context,
         '${widget.materia.nombre} - ${clase.fecha}',
         actions: [
-          // Activar / desactivar el QR (al lado del PDF)
+          // botón Activar / Desactivar (al lado del PDF)
           if (!cargando)
             activo
                 ? TextButton.icon(
@@ -270,7 +270,7 @@ class _QrClasePageState extends State<QrClasePage> {
                     ),
                   )
                 : TextButton.icon(
-                    // Una clase de otro día ya no se puede activar
+                    // clase de otro día: no se puede activar
                     onPressed: clase.esDeHoy ? activarQr : null,
                     icon: const Icon(Icons.qr_code),
                     label: const Text('Activar'),
@@ -310,7 +310,7 @@ class _QrClasePageState extends State<QrClasePage> {
               ),
             ),
           ] else ...[
-            // El QR va sobre un marco blanco para que se escanee bien en tema oscuro
+            // marco blanco para que el QR se lea bien en tema oscuro
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -386,10 +386,10 @@ class _QrClasePageState extends State<QrClasePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('DNI: ${alumno.dni}'),
-                        // Comparación con el padrón de la materia (si hay padrón cargado)
+                        // comparo con el padrón (si cargué uno)
                         if (widget.materia.inscriptos.isNotEmpty)
                           ...avisoPadron(alumno),
-                        // Aviso: el alumno cambió sus datos desde la última vez
+                        // aviso naranja: cambió sus datos
                         if (alumno.cambioDatos)
                           Text(
                             '⚠ Cambió sus datos (antes: ${alumno.nombreAnterior}, '

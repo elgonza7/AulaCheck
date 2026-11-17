@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:aulacheck/src/config/app_theme.dart';
 import 'package:aulacheck/src/widgets/layout_base.dart';
 
-// Avatar redondo: muestra la foto del alumno si tiene, o sus iniciales si no.
-// La foto viene como texto "base64" (así se guarda en Firestore y en el celular).
+// Avatar: la foto si tiene, si no las iniciales.
+// La foto viene en base64 (así la guardo en Firestore y en el celu).
 class AvatarAlumno extends StatelessWidget {
   final String nombre;
   final String? foto; // base64 o null
@@ -20,7 +20,7 @@ class AvatarAlumno extends StatelessWidget {
     this.radio = 20,
   });
 
-  // Guarda las fotos ya convertidas para no decodificarlas en cada redibujo
+  // cache: si no, decodifica la foto en cada redibujo
   static final Map<String, Uint8List> _cache = {};
 
   static Uint8List? _bytes(String? foto) {
@@ -28,7 +28,7 @@ class AvatarAlumno extends StatelessWidget {
     try {
       return _cache.putIfAbsent(foto, () => base64Decode(foto));
     } catch (_) {
-      return null; // texto dañado: se muestran las iniciales
+      return null; // base64 roto -> muestro iniciales
     }
   }
 

@@ -8,9 +8,9 @@ import 'package:aulacheck/src/services/datos.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await TemaController.cargar(); // recupera el tema (claro u oscuro) elegido
-  await Datos.cargarAjustes(); // duración del QR y distancia máxima
+  await TemaController.cargar(); // el tema que quedó guardado (claro/oscuro)
+  await Datos.cargarAjustes(); // minutos del QR y radio (de Ajustes)
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await Datos.cargar(); // recupera lo guardado en la nube antes de abrir la app
+  await Datos.cargar(); // si el profe ya estaba logueado, trae sus carreras de Firebase
   runApp(const AulaCheckApp());
 }

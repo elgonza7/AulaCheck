@@ -4,8 +4,8 @@ import 'package:aulacheck/src/pages/profesor/cruds/carreras_page.dart';
 import 'package:aulacheck/src/config/app_theme.dart';
 import 'package:aulacheck/src/widgets/layout_base.dart';
 
-// Si el profesor no inició sesión muestra el login (o el registro).
-// Si ya inició sesión muestra su panel.
+// Sin sesión -> login (o registro).
+// Con sesión -> panel del profe.
 class ProfessorPage extends StatefulWidget {
   const ProfessorPage({super.key});
 
@@ -14,7 +14,7 @@ class ProfessorPage extends StatefulWidget {
 }
 
 class _ProfessorPageState extends State<ProfessorPage> {
-  bool esRegistro = false; // false = iniciar sesión, true = crear cuenta
+  bool esRegistro = false; // false = login, true = crear cuenta
   bool cargando = false;
   bool ocultarContrasena = true;
 
@@ -148,7 +148,7 @@ class _ProfessorPageState extends State<ProfessorPage> {
             style: TextStyle(color: context.textoSuave),
           ),
           const SizedBox(height: 24),
-          // Nombre y DNI solo se piden al crear la cuenta
+          // nombre y DNI solo al registrarse
           if (esRegistro) ...[
             TextField(
               controller: ctrlNombre,
@@ -284,7 +284,7 @@ class _ProfessorPageState extends State<ProfessorPage> {
                 context,
                 MaterialPageRoute(builder: (context) => const CarrerasPage()),
               );
-              // Por si cerró sesión desde Ajustes
+              // por si cerró sesión desde Ajustes
               if (mounted) setState(() {});
             },
           ),

@@ -21,21 +21,21 @@ class _PageClassState extends State<PageClass> {
   @override
   void initState() {
     super.initState();
-    refrescar(); // trae de la nube las asistencias que se hayan registrado
+    refrescar(); // traigo las asistencias de la nube
   }
 
-  // Vuelve a leer las asistencias. También se dispara al deslizar la lista
-  // hacia abajo (RefreshIndicator).
+  // releo asistencias. También se llama al tirar la lista para abajo
+  // (RefreshIndicator).
   Future<void> refrescar() async {
     try {
       await Datos.sincronizarAsistencias();
     } catch (_) {
-      // Sin internet: se queda lo que ya estaba cargado
+      // sin internet: dejo lo que ya tenía
     }
     if (mounted) setState(() {});
   }
 
-  // Avisos: alumnos que cambiaron sus datos entre una clase y otra
+  // avisos: los que cambiaron datos entre clases
   List<Widget> avisosCambioDatos() {
     final avisos = widget.materia.avisosCambioDatos();
     final distintos = widget.materia.nombresDistintos();
@@ -70,7 +70,7 @@ class _PageClassState extends State<PageClass> {
                     style: TextStyle(color: context.textoSuave),
                   ),
                 ),
-              // Mismo DNI que el padrón pero otro nombre
+              // mismo DNI que el padrón, otro nombre
               for (final d in distintos)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
@@ -140,7 +140,7 @@ class _PageClassState extends State<PageClass> {
 
   Future<void> nuevaClase() async {
     final materia = widget.materia;
-    // Una sola clase por día: si ya existe la de hoy, se abre esa
+    // una clase por día: si ya está la de hoy, abro esa
     var clase = materia.clases.where((c) => c.esDeHoy).firstOrNull;
     final recienCreada = clase == null;
     if (clase == null) {
@@ -153,7 +153,7 @@ class _PageClassState extends State<PageClass> {
       Datos.guardar();
       setState(() {});
     }
-    // Si la clase de hoy ya existía, solo se abre (el QR no se regenera)
+    // si ya existía solo la abro, el QR NO se regenera (era el problema de antes)
     await abrirQr(clase, activar: recienCreada);
   }
 
@@ -168,7 +168,7 @@ class _PageClassState extends State<PageClass> {
         ),
       ),
     );
-    // Al volver se actualizan los contadores de presentes
+    // al volver actualizo cuántos presentes hay
     if (mounted) setState(() {});
   }
 
@@ -253,12 +253,12 @@ class _PageClassState extends State<PageClass> {
     );
   }
 
-  // Muestra los 3 alumnos con más asistencias
+  // top 3 de asistencia
   Widget resumenAsistencia() {
     final ranking = widget.materia.rankingAsistencia();
     final totalClases = widget.materia.clases.length;
 
-    // Colores de los trofeos: oro, plata y bronce
+    // oro, plata, bronce
     const medallas = [Color(0xFFFFC107), Color(0xFFB0BEC5), Color(0xFFCD7F32)];
 
     return Card(
