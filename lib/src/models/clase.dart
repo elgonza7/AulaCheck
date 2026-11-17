@@ -35,11 +35,16 @@ class Clase {
       );
 
   // Fecha con formato 21/09/2026
-  String get fecha {
-    final d = fechaCreacion.day.toString().padLeft(2, '0');
-    final m = fechaCreacion.month.toString().padLeft(2, '0');
-    return '$d/$m/${fechaCreacion.year}';
+  String get fecha => formatoFecha(fechaCreacion);
+
+  static String formatoFecha(DateTime dia) {
+    final d = dia.day.toString().padLeft(2, '0');
+    final m = dia.month.toString().padLeft(2, '0');
+    return '$d/$m/${dia.year}';
   }
+
+  // Una clase es de un solo día: el QR solo se puede activar ese día
+  bool get esDeHoy => fecha == formatoFecha(DateTime.now());
 
   // Devuelve false si el alumno ya estaba registrado en esta clase
   bool registrarAsistencia(Alumno alumno) {

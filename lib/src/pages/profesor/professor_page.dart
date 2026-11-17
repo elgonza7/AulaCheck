@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:aulacheck/src/models/models.dart';
 import 'package:aulacheck/src/services/datos.dart';
-import 'package:aulacheck/src/pages/profesor/carreras_page.dart';
+import 'package:aulacheck/src/pages/profesor/cruds/carreras_page.dart';
 import 'package:aulacheck/src/config/app_theme.dart';
 import 'package:aulacheck/src/widgets/layout_base.dart';
 
+// Si el profesor no inició sesión muestra el login (o el registro).
+// Si ya inició sesión muestra su panel.
 class ProfessorPage extends StatefulWidget {
   const ProfessorPage({super.key});
 
@@ -14,153 +14,205 @@ class ProfessorPage extends StatefulWidget {
 }
 
 class _ProfessorPageState extends State<ProfessorPage> {
-  Profesor? profesor;
-  bool cargando = true;
+  bool esRegistro = false; // false = iniciar sesión, true = crear cuenta
+  bool cargando = false;
+  bool ocultarContrasena = true;
 
   final TextEditingController ctrlNombre = TextEditingController();
   final TextEditingController ctrlDni = TextEditingController();
-  final TextEditingController ctrlCarrera = TextEditingController();
-  final TextEditingController ctrlMateria = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    cargarDatos();
-  }
+  final TextEditingController ctrlEmail = TextEditingController();
+  final TextEditingController ctrlContrasena = TextEditingController();
 
   @override
   void dispose() {
     ctrlNombre.dispose();
     ctrlDni.dispose();
-    ctrlCarrera.dispose();
-    ctrlMateria.dispose();
+    ctrlEmail.dispose();
+    ctrlContrasena.dispose();
     super.dispose();
   }
 
-  Future<void> cargarDatos() async {
-    final prefs = await SharedPreferences.getInstance();
-    final nombre = prefs.getString('prof_nombre');
-
-    if (nombre != null) {
-      profesor = Profesor(
-        nombre: nombre,
-        dni: prefs.getString('prof_dni') ?? '',
-        carrera: prefs.getString('prof_carrera') ?? '',
-        materia: prefs.getString('prof_materia') ?? '',
-      );
-      Datos.profesor = profesor;
-      Datos.agregarMateria(profesor!.carrera, profesor!.materia);
-    }
-
-    if (mounted) setState(() => cargando = false);
+  void mostrarMensaje(String texto) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
   }
 
-  Future<void> guardarDatos() async {
-    if (ctrlNombre.text.trim().isEmpty ||
-        ctrlDni.text.trim().isEmpty ||
-        ctrlCarrera.text.trim().isEmpty ||
-        ctrlMateria.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Completá todos los campos')),
-      );
+  Future<void> enviar() async {
+    final email = ctrlEmail.text.trim();
+    final contrasena = ctrlContrasena.text;
+
+    if (email.isEmpty || contrasena.isEmpty) {
+      mostrarMensaje('Completá el email y la contraseña');
+      return;
+    }
+    if (esRegistro &&
+        (ctrlNombre.text.trim().isEmpty || ctrlDni.text.trim().isEmpty)) {
+      mostrarMensaje('Completá tu nombre y DNI');
       return;
     }
 
-    final nuevo = Profesor(
-      nombre: ctrlNombre.text.trim(),
-      dni: ctrlDni.text.trim(),
-      carrera: ctrlCarrera.text.trim(),
-      materia: ctrlMateria.text.trim(),
-    );
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('prof_nombre', nuevo.nombre);
-    await prefs.setString('prof_dni', nuevo.dni);
-    await prefs.setString('prof_carrera', nuevo.carrera);
-    await prefs.setString('prof_materia', nuevo.materia);
-
-    Datos.profesor = nuevo;
-    await Datos.cargar(); // si ese DNI ya tenía datos en la nube, los recupera
-    Datos.agregarMateria(nuevo.carrera, nuevo.materia);
-
-    if (mounted) setState(() => profesor = nuevo);
+    setState(() => cargando = true);
+    try {
+      if (esRegistro) {
+        await Datos.registrarProfesor(
+          nombre: ctrlNombre.text.trim(),
+          dni: ctrlDni.text.trim(),
+          email: email,
+          contrasena: contrasena,
+        );
+      } else {
+        await Datos.iniciarSesion(email, contrasena);
+      }
+      ctrlContrasena.clear();
+    } catch (e) {
+      mostrarMensaje(Datos.mensajeError(e));
+    }
+    if (mounted) setState(() => cargando = false);
   }
 
-  void editarDatos() {
-    ctrlNombre.text = profesor!.nombre;
-    ctrlDni.text = profesor!.dni;
-    ctrlCarrera.text = profesor!.carrera;
-    ctrlMateria.text = profesor!.materia;
-    setState(() => profesor = null);
+  Future<void> cerrarSesion() async {
+    await Datos.cerrarSesion();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> editarPerfil() async {
+    final p = Datos.profesor!;
+    ctrlNombre.text = p.nombre;
+    ctrlDni.text = p.dni;
+
+    final guardar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Editar mis datos'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: ctrlNombre,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(labelText: 'Nombre completo'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrlDni,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'DNI'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    if (guardar != true) return;
+    if (ctrlNombre.text.trim().isEmpty || ctrlDni.text.trim().isEmpty) return;
+
+    try {
+      await Datos.actualizarPerfil(ctrlNombre.text.trim(), ctrlDni.text.trim());
+    } catch (e) {
+      mostrarMensaje(Datos.mensajeError(e));
+    }
+    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: aulaAppBar(context, 'Panel Docente'),
-      body: cargando
-          ? const Center(child: CircularProgressIndicator())
-          : profesor == null
-              ? formularioRegistro()
-              : panelDocente(),
+      body: Datos.profesor == null ? formularioSesion() : panelDocente(),
     );
   }
 
-  Widget formularioRegistro() {
+  Widget formularioSesion() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Datos del profesor',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          Text(
+            esRegistro ? 'Crear cuenta de profesor' : 'Iniciar sesión',
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
           Text(
-            'Los completás una sola vez.',
+            esRegistro
+                ? 'Con esta cuenta recuperás tus materias en cualquier celular.'
+                : 'Entrá con tu email y contraseña.',
             style: TextStyle(color: context.textoSuave),
           ),
           const SizedBox(height: 24),
+          // Nombre y DNI solo se piden al crear la cuenta
+          if (esRegistro) ...[
+            TextField(
+              controller: ctrlNombre,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Nombre completo',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: ctrlDni,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'DNI',
+                prefixIcon: Icon(Icons.badge_outlined),
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
           TextField(
-            controller: ctrlNombre,
-            textCapitalization: TextCapitalization.words,
+            controller: ctrlEmail,
+            keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(
-              labelText: 'Nombre completo',
-              prefixIcon: Icon(Icons.person_outline),
+              labelText: 'Email',
+              prefixIcon: Icon(Icons.alternate_email),
             ),
           ),
           const SizedBox(height: 14),
           TextField(
-            controller: ctrlDni,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'DNI',
-              prefixIcon: Icon(Icons.badge_outlined),
-            ),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: ctrlCarrera,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              labelText: 'Carrera',
-              prefixIcon: Icon(Icons.school_outlined),
-            ),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: ctrlMateria,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              labelText: 'Materia',
-              prefixIcon: Icon(Icons.menu_book_outlined),
+            controller: ctrlContrasena,
+            obscureText: ocultarContrasena,
+            decoration: InputDecoration(
+              labelText: 'Contraseña',
+              helperText: esRegistro ? 'Mínimo 6 caracteres' : null,
+              prefixIcon: const Icon(Icons.lock_outline),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  ocultarContrasena ? Icons.visibility : Icons.visibility_off,
+                ),
+                onPressed: () =>
+                    setState(() => ocultarContrasena = !ocultarContrasena),
+              ),
             ),
           ),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: guardarDatos,
-            child: const Text('Guardar'),
+            onPressed: cargando ? null : enviar,
+            child: cargando
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(esRegistro ? 'Crear cuenta' : 'Entrar'),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => setState(() => esRegistro = !esRegistro),
+            child: Text(
+              esRegistro
+                  ? '¿Ya tenés cuenta? Iniciá sesión'
+                  : '¿No tenés cuenta? Creá una',
+            ),
           ),
         ],
       ),
@@ -168,7 +220,7 @@ class _ProfessorPageState extends State<ProfessorPage> {
   }
 
   Widget panelDocente() {
-    final p = profesor!;
+    final p = Datos.profesor!;
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -208,7 +260,7 @@ class _ProfessorPageState extends State<ProfessorPage> {
                           style: TextStyle(color: context.textoSuave),
                         ),
                         Text(
-                          '${p.carrera} · ${p.materia}',
+                          p.email,
                           style: TextStyle(color: context.textoSuave),
                         ),
                       ],
@@ -217,7 +269,7 @@ class _ProfessorPageState extends State<ProfessorPage> {
                   IconButton(
                     icon: const Icon(Icons.edit_outlined),
                     tooltip: 'Editar mis datos',
-                    onPressed: editarDatos,
+                    onPressed: editarPerfil,
                   ),
                 ],
               ),
@@ -227,12 +279,20 @@ class _ProfessorPageState extends State<ProfessorPage> {
           ElevatedButton.icon(
             icon: const Icon(Icons.menu_book),
             label: const Text('Ver Mis Carreras y Materias'),
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const CarrerasPage()),
               );
+              // Por si cerró sesión desde Ajustes
+              if (mounted) setState(() {});
             },
+          ),
+          const SizedBox(height: 12),
+          TextButton.icon(
+            icon: const Icon(Icons.logout),
+            label: const Text('Cerrar sesión'),
+            onPressed: cerrarSesion,
           ),
         ],
       ),

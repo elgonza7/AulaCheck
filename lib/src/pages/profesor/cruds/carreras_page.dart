@@ -1,20 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:aulacheck/src/services/datos.dart';
 import 'package:aulacheck/src/models/models.dart';
-import 'package:aulacheck/src/pages/profesor/page_class.dart';
+import 'package:aulacheck/src/pages/profesor/cruds/materias_page.dart';
 import 'package:aulacheck/src/widgets/estado_vacio.dart';
 import 'package:aulacheck/src/widgets/layout_base.dart';
 
-class MateriasPage extends StatefulWidget {
-  final Carrera carrera;
-
-  const MateriasPage({super.key, required this.carrera});
+class CarrerasPage extends StatefulWidget {
+  const CarrerasPage({super.key});
 
   @override
-  State<MateriasPage> createState() => _MateriasPageState();
+  State<CarrerasPage> createState() => _CarrerasPageState();
 }
 
-class _MateriasPageState extends State<MateriasPage> {
+class _CarrerasPageState extends State<CarrerasPage> {
   final TextEditingController ctrl = TextEditingController();
 
   @override
@@ -23,21 +21,21 @@ class _MateriasPageState extends State<MateriasPage> {
     super.dispose();
   }
 
-  void addMateria() {
+  void addCarrera() {
     ctrl.clear();
     showDialog(
       context: context,
       builder: (BuildContext ctx) {
         return AlertDialog(
-          title: const Text('Crear nueva materia'),
+          title: const Text('Crear nueva carrera'),
           content: TextField(
             controller: ctrl,
+            autofocus: true,
             decoration: const InputDecoration(
-              hintText: 'Ej: Base de datos 2',
-              labelText: 'Nombre de materia',
+              hintText: 'Ej: Ingeniería en Sistemas',
+              labelText: 'Nombre de la carrera',
               border: OutlineInputBorder(),
             ),
-            autofocus: true,
           ),
           actions: [
             TextButton(
@@ -51,7 +49,7 @@ class _MateriasPageState extends State<MateriasPage> {
               onPressed: () {
                 if (ctrl.text.trim().isNotEmpty) {
                   setState(() {
-                    widget.carrera.materias.add(Materia(nombre: ctrl.text.trim()));
+                    Datos.carreras.add(Carrera(nombre: ctrl.text.trim()));
                   });
                   Datos.guardar();
                   ctrl.clear();
@@ -66,17 +64,17 @@ class _MateriasPageState extends State<MateriasPage> {
     );
   }
 
-  void editarMateria(Materia materia) {
-    ctrl.text = materia.nombre;
+  void editarCarrera(Carrera carrera) {
+    ctrl.text = carrera.nombre;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Editar materia'),
+        title: const Text('Editar carrera'),
         content: TextField(
           controller: ctrl,
           autofocus: true,
           decoration: const InputDecoration(
-            labelText: 'Nombre de la materia',
+            labelText: 'Nombre de la carrera',
             border: OutlineInputBorder(),
           ),
         ),
@@ -86,7 +84,7 @@ class _MateriasPageState extends State<MateriasPage> {
             onPressed: () {
               final nombre = ctrl.text.trim();
               if (nombre.isEmpty) return;
-              setState(() => materia.nombre = nombre);
+              setState(() => carrera.nombre = nombre);
               Datos.guardar();
               Navigator.pop(ctx);
             },
@@ -97,12 +95,12 @@ class _MateriasPageState extends State<MateriasPage> {
     );
   }
 
-  Future<void> eliminarMateria(Materia materia) async {
+  Future<void> eliminarCarrera(Carrera carrera) async {
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar materia'),
-        content: Text('¿Eliminar "${materia.nombre}" y todas sus clases?'),
+        title: const Text('Eliminar carrera'),
+        content: Text('¿Eliminar "${carrera.nombre}" y todas sus materias y clases?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           FilledButton(
@@ -114,36 +112,35 @@ class _MateriasPageState extends State<MateriasPage> {
       ),
     );
     if (confirmar != true || !mounted) return;
-    setState(() => widget.carrera.materias.remove(materia));
+    setState(() => Datos.carreras.remove(carrera));
     await Datos.guardar();
   }
 
   @override
   Widget build(BuildContext context) {
-    final materias = widget.carrera.materias;
+    final carreras = Datos.carreras;
 
     return Scaffold(
-      appBar: aulaAppBar(context, widget.carrera.nombre),
-      body: materias.isEmpty
+      appBar: aulaAppBar(context, 'Mis carreras'),
+      body: carreras.isEmpty
           ? const EstadoVacio(
-              icono: Icons.menu_book_outlined,
-              mensaje: 'Esta carrera todavía no tiene materias.\nTocá "Nueva materia" para agregar una.',
+              icono: Icons.school_outlined,
+              mensaje: 'Todavía no creaste carreras.\nTocá "Nueva carrera" para empezar.',
             )
           : ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-              itemCount: materias.length,
+              itemCount: carreras.length,
               itemBuilder: (context, i) {
-                final m = materias[i];
-
+                final c = carreras[i];
                 return Card(
                   child: ListTile(
-                    title: Text(m.nombre),
-                    subtitle: Text('${m.clases.length} clases'),
-                    leading: const Icon(Icons.menu_book),
+                    leading: const Icon(Icons.school),
+                    title: Text(c.nombre),
+                    subtitle: Text('${c.materias.length} materias'),
                     trailing: PopupMenuButton<String>(
                       onSelected: (accion) {
-                        if (accion == 'editar') editarMateria(m);
-                        if (accion == 'eliminar') eliminarMateria(m);
+                        if (accion == 'editar') editarCarrera(c);
+                        if (accion == 'eliminar') eliminarCarrera(c);
                       },
                       itemBuilder: (_) => const [
                         PopupMenuItem(value: 'editar', child: Text('Editar')),
@@ -154,7 +151,7 @@ class _MateriasPageState extends State<MateriasPage> {
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => PageClass(materia: m),
+                          builder: (context) => MateriasPage(carrera: c),
                         ),
                       );
                       if (mounted) setState(() {});
@@ -164,8 +161,8 @@ class _MateriasPageState extends State<MateriasPage> {
               },
             ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: addMateria,
-        label: const Text('Nueva materia'),
+        onPressed: addCarrera,
+        label: const Text('Nueva carrera'),
         icon: const Icon(Icons.add),
       ),
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:aulacheck/src/models/models.dart';
 import 'package:aulacheck/src/services/datos.dart';
 import 'package:aulacheck/src/services/pdf_service.dart';
+import 'package:aulacheck/src/pages/profesor/cruds/alumnos_materia_page.dart';
 import 'package:aulacheck/src/pages/profesor/qr_clase_page.dart';
 import 'package:aulacheck/src/config/app_theme.dart';
 import 'package:aulacheck/src/widgets/estado_vacio.dart';
@@ -37,7 +38,8 @@ class _PageClassState extends State<PageClass> {
   // Avisos: alumnos que cambiaron sus datos entre una clase y otra
   List<Widget> avisosCambioDatos() {
     final avisos = widget.materia.avisosCambioDatos();
-    if (avisos.isEmpty) return [];
+    final distintos = widget.materia.nombresDistintos();
+    if (avisos.isEmpty && distintos.isEmpty) return [];
 
     return [
       Card(
@@ -65,6 +67,17 @@ class _PageClassState extends State<PageClass> {
                     'en ${aviso.clase.nombre} (${aviso.clase.fecha}) con otros datos. '
                     'Antes: ${aviso.alumno.nombreAnterior}, '
                     'DNI ${aviso.alumno.dniAnterior}.',
+                    style: TextStyle(color: context.textoSuave),
+                  ),
+                ),
+              // Mismo DNI que el padrón pero otro nombre
+              for (final d in distintos)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text(
+                    'DNI ${d.alumno.dni} se registró como "${d.alumno.nombre}" '
+                    'en ${d.clase.nombre} (${d.clase.fecha}), pero en el padrón '
+                    'figura como "${d.inscripto.nombre}".',
                     style: TextStyle(color: context.textoSuave),
                   ),
                 ),
@@ -127,10 +140,9 @@ class _PageClassState extends State<PageClass> {
 
   Future<void> nuevaClase() async {
     final materia = widget.materia;
-    final hoy = Clase(nombre: '', materia: materia.nombre, alumnos: []).fecha;
-
-    // Una sola clase por día: si ya existe, se reabre para generar otro QR
-    var clase = materia.clases.where((c) => c.fecha == hoy).firstOrNull;
+    // Una sola clase por día: si ya existe la de hoy, se abre esa
+    var clase = materia.clases.where((c) => c.esDeHoy).firstOrNull;
+    final recienCreada = clase == null;
     if (clase == null) {
       clase = Clase(
         nombre: 'Clase ${materia.clases.length + 1}',
@@ -141,14 +153,19 @@ class _PageClassState extends State<PageClass> {
       Datos.guardar();
       setState(() {});
     }
-    await abrirQr(clase);
+    // Si la clase de hoy ya existía, solo se abre (el QR no se regenera)
+    await abrirQr(clase, activar: recienCreada);
   }
 
-  Future<void> abrirQr(Clase clase) async {
+  Future<void> abrirQr(Clase clase, {bool activar = false}) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => QrClasePage(materia: widget.materia, clase: clase),
+        builder: (context) => QrClasePage(
+          materia: widget.materia,
+          clase: clase,
+          activarAlAbrir: activar,
+        ),
       ),
     );
     // Al volver se actualizan los contadores de presentes
@@ -164,6 +181,19 @@ class _PageClassState extends State<PageClass> {
         context,
         widget.materia.nombre,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.groups_outlined),
+            tooltip: 'Alumnos de la materia',
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AlumnosMateriaPage(materia: widget.materia),
+                ),
+              );
+              if (mounted) setState(() {});
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.picture_as_pdf),
             tooltip: 'Descargar lista de la materia',

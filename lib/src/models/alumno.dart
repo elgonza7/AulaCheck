@@ -9,6 +9,11 @@ class Alumno {
   String? nombreAnterior;
   int? dniAnterior;
 
+  // Foto del alumno (texto base64). Viaja con la asistencia para que el profesor
+  // vea la cara de quien se registró. No se guarda dentro de las materias del
+  // profesor (toJson) para no llenar ese documento.
+  String? foto;
+
   Alumno({
     required this.nombre,
     required this.registro,
@@ -16,6 +21,7 @@ class Alumno {
     DateTime? hora,
     this.nombreAnterior,
     this.dniAnterior,
+    this.foto,
   }) : hora = hora ?? DateTime.now();
 
   bool get cambioDatos => dniAnterior != null;

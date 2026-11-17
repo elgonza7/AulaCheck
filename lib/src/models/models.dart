@@ -3,5 +3,6 @@
 export 'alumno.dart';
 export 'carrera.dart';
 export 'clase.dart';
+export 'inscripto.dart';
 export 'materia.dart';
 export 'profesor.dart';

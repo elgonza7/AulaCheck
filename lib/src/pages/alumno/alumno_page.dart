@@ -3,8 +3,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:aulacheck/src/models/models.dart';
 import 'package:aulacheck/src/services/datos.dart';
+import 'package:aulacheck/src/pages/alumno/cruds/datos_alumno.dart';
 import 'package:aulacheck/src/pages/alumno/scanner_page.dart';
 import 'package:aulacheck/src/config/app_theme.dart';
+import 'package:aulacheck/src/widgets/avatar_alumno.dart';
 import 'package:aulacheck/src/widgets/layout_base.dart';
 
 class AlumnoPage extends StatefulWidget {
@@ -17,12 +19,10 @@ class AlumnoPage extends StatefulWidget {
 class _AlumnoPageState extends State<AlumnoPage> {
   String nombre = "";
   String dni = "";
+  String? foto; // foto del alumno en base64 (null si no sacó ninguna)
   String claseInfo = "";
   String fechaInfo = "";
   bool cargando = false;
-
-  final TextEditingController ctrlNombre = TextEditingController();
-  final TextEditingController ctrlDni = TextEditingController();
 
   @override
   void initState() {
@@ -46,6 +46,7 @@ class _AlumnoPageState extends State<AlumnoPage> {
     setState(() {
       nombre = prefs.getString('nombre') ?? "";
       dni = prefs.getString('dni') ?? "";
+      foto = prefs.getString('foto');
       if (registradoHoy) {
         claseInfo = prefs.getString('ultima_materia') ?? "";
         fechaInfo = prefs.getString('ultima_fecha') ?? "";
@@ -53,75 +54,13 @@ class _AlumnoPageState extends State<AlumnoPage> {
     });
   }
 
-  Future<void> guardarDatos() async {
-    final nuevoNombre = ctrlNombre.text.trim();
-    final nuevoDni = ctrlDni.text.trim();
-
-    if (nuevoNombre.isEmpty || nuevoDni.isEmpty) {
-      mostrarError('Completá el nombre y el DNI');
-      return;
-    }
-
-    // El DNI se guarda como número en la asistencia, así que tiene que serlo
-    if (int.tryParse(nuevoDni) == null) {
-      mostrarError('El DNI tiene que ser un número');
-      return;
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('nombre', nuevoNombre);
-    await prefs.setString('dni', nuevoDni);
-    setState(() {
-      nombre = nuevoNombre;
-      dni = nuevoDni;
-    });
-    if (mounted) Navigator.pop(context);
-  }
-
-  void modalInfo() {
-    // Si ya hay datos cargados se muestran para poder corregirlos
-    ctrlNombre.text = nombre;
-    ctrlDni.text = dni;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Datos del alumno'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: ctrlNombre,
-              decoration: const InputDecoration(labelText: 'Nombre completo'),
-            ),
-            TextField(
-              controller: ctrlDni,
-              decoration: const InputDecoration(labelText: 'DNI o Registro'),
-              keyboardType: TextInputType.number,
-            ),
-            if (nombre.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                'Corregir tus datos no registra asistencia. Si ya registraste '
-                'hoy con un dato equivocado, pedile al profesor que lo corrija. '
-                'En tu próxima asistencia, el profesor va a ver que cambiaste '
-                'tus datos.',
-                style: TextStyle(fontSize: 12, color: ctx.textoSuave),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: guardarDatos,
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
+  // Abre el CRUD de los datos del alumno (alumno/cruds/datos_alumno.dart)
+  Future<void> modalInfo() async {
+    final cambio = await abrirFormularioAlumno(
+      context,
+      DatosAlumno(nombre: nombre, dni: dni, foto: foto),
     );
+    if (cambio) cargarDatos(); // se vuelven a leer los datos guardados
   }
 
   Future<void> escanearYValidar() async {
@@ -173,6 +112,16 @@ class _AlumnoPageState extends State<AlumnoPage> {
         return;
       }
 
+      // El QR se valida contra la nube: tiene que ser el que el profesor tiene activo
+      final clase = await Datos.validarQr(codigo);
+      if (!mounted) return;
+      if (clase == null) {
+        mostrarError('QR inválido, vencido o desactivado por el profesor');
+        return;
+      }
+
+      // La distancia máxima la elige el profesor en Ajustes y viene con la clase
+      final radio = (clase['radio'] as int? ?? 100).toDouble();
       final dist = Geolocator.distanceBetween(
         pos.latitude,
         pos.longitude,
@@ -180,20 +129,11 @@ class _AlumnoPageState extends State<AlumnoPage> {
         ubicacionQr.longitud,
       );
 
-      if (dist > Datos.radioAsistenciaMetros) {
+      if (dist > radio) {
         mostrarError(
           'Estás demasiado lejos del profesor. '
-          'Distancia: ${dist.toInt()} m '
-          '(máximo ${Datos.radioAsistenciaMetros.toInt()} m)',
+          'Distancia: ${dist.toInt()} m (máximo ${radio.toInt()} m)',
         );
-        return;
-      }
-
-      // El QR se valida contra la nube: tiene que ser el vigente del profesor
-      final clase = await Datos.validarQr(codigo);
-      if (!mounted) return;
-      if (clase == null) {
-        mostrarError('QR inválido o vencido, escaneá el actual');
         return;
       }
 
@@ -220,6 +160,7 @@ class _AlumnoPageState extends State<AlumnoPage> {
           dni: dniNumero,
           nombreAnterior: cambio ? regNombre : null,
           dniAnterior: cambio ? regDni : null,
+          foto: foto, // el profesor ve la foto en la lista de presentes
         ),
       );
       if (!mounted) return;
@@ -268,17 +209,7 @@ class _AlumnoPageState extends State<AlumnoPage> {
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      CircleAvatar(
-                        radius: 26,
-                        backgroundColor: AppTheme.violeta,
-                        child: Text(
-                          iniciales(nombre),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
+                      AvatarAlumno(nombre: nombre, foto: foto, radio: 26),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(

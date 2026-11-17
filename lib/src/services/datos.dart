@@ -1,26 +1,30 @@
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:aulacheck/src/models/models.dart';
 
 // Datos compartidos entre pantallas.
-// Se guardan en Firestore (la nube), así el profesor y los alumnos pueden
-// usar celulares distintos.
+// Se guardan en Firestore (la nube), así el profesor puede cambiar de celular
+// y los alumnos pueden usar el suyo.
+//
+// El profesor inicia sesión con email y contraseña (Firebase Authentication).
+// Cada profesor tiene un "uid": un identificador único que le da Firebase.
 //
 // Colecciones de Firestore:
-//   profesores/{dni}          -> árbol completo de carreras, materias y clases del profesor
-//   clases/{idClase}          -> QR vigente de la clase (lo escribe el profesor, lo lee el alumno)
+//   profesores/{uid}            -> perfil del profesor + árbol de carreras, materias y clases
+//   clases/{idClase}            -> QR activo de la clase (lo escribe el profesor, lo lee el alumno)
 //   asistencias/{idClase}_{dni} -> un documento por alumno presente
 class Datos {
   static Profesor? profesor;
   static final List<Carrera> carreras = [];
 
-  // Cuánto dura un QR antes de vencer
-  static const int minutosValidez = 10;
-  static const double radioAsistenciaMetros = 100;
+  // Ajustes del QR (se cambian en la pantalla de Ajustes)
+  static int minutosQr = 10; // cuánto dura un QR activo
+  static int radioMetros = 100; // a qué distancia del profesor tiene que estar el alumno
 
   static const String claveAsistenciaDispositivo = 'asistencia_dispositivo_';
 
@@ -30,23 +34,90 @@ class Datos {
   static const Duration _espera = Duration(seconds: 8);
 
   static FirebaseFirestore get _db => FirebaseFirestore.instance;
+  static FirebaseAuth get _auth => FirebaseAuth.instance;
 
-  // DNI del profesor: se usa como nombre del documento donde se guardan sus datos
-  static Future<String?> _dniProfesor() async {
-    var dni = profesor?.dni;
-    if (dni == null || dni.trim().isEmpty) {
-      final prefs = await SharedPreferences.getInstance();
-      dni = prefs.getString('prof_dni');
-    }
-    if (dni == null || dni.trim().isEmpty) return null;
-    return dni.trim().replaceAll('/', '_');
+  // Identificador del profesor que inició sesión (null si no hay nadie)
+  static String? get _uid => _auth.currentUser?.uid;
+
+  static DocumentReference<Map<String, dynamic>> _docProfesor(String uid) =>
+      _db.collection('profesores').doc(uid);
+
+  // ----------------------------------------------------------- Sesión
+
+  // Crea la cuenta del profesor y guarda su perfil en la nube
+  static Future<void> registrarProfesor({
+    required String nombre,
+    required String dni,
+    required String email,
+    required String contrasena,
+  }) async {
+    final cred = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: contrasena,
+    );
+    await _docProfesor(cred.user!.uid).set({
+      'nombre': nombre,
+      'dni': dni,
+      'email': email,
+      'datos': '[]',
+    });
+    await cargar();
   }
 
-  // Guarda todas las carreras (con sus materias, clases y asistencias) en la nube.
+  static Future<void> iniciarSesion(String email, String contrasena) async {
+    await _auth.signInWithEmailAndPassword(email: email, password: contrasena);
+    await cargar();
+  }
+
+  static Future<void> cerrarSesion() async {
+    await _auth.signOut();
+    profesor = null;
+    carreras.clear();
+    _cargado = false;
+  }
+
+  // Cambia nombre y DNI del profesor (el email no se toca)
+  static Future<void> actualizarPerfil(String nombre, String dni) async {
+    final uid = _uid;
+    if (uid == null || profesor == null) return;
+    await _docProfesor(uid)
+        .set({'nombre': nombre, 'dni': dni}, SetOptions(merge: true))
+        .timeout(_espera);
+    profesor!.nombre = nombre;
+    profesor!.dni = dni;
+  }
+
+  // Traduce los errores de Firebase a mensajes entendibles
+  static String mensajeError(Object e) {
+    if (e is FirebaseAuthException) {
+      switch (e.code) {
+        case 'invalid-email':
+          return 'El email no es válido';
+        case 'user-not-found':
+        case 'wrong-password':
+        case 'invalid-credential':
+          return 'Email o contraseña incorrectos';
+        case 'email-already-in-use':
+          return 'Ya existe una cuenta con ese email';
+        case 'weak-password':
+          return 'La contraseña debe tener al menos 6 caracteres';
+        case 'operation-not-allowed':
+          return 'Falta activar "Email/Password" en Firebase Authentication';
+        case 'network-request-failed':
+          return 'Sin conexión a internet';
+      }
+      return e.message ?? e.code;
+    }
+    return e.toString();
+  }
+
+  // ----------------------------------------------------------- Guardar y leer
+
+  // Guarda todas las carreras (con sus materias y clases) en la nube.
   // Hay que llamarla cada vez que se cambia algo.
   static Future<void> guardar() async {
-    final dni = await _dniProfesor();
-    if (dni == null) return;
+    final uid = _uid;
+    if (uid == null) return;
     if (!_cargado) {
       debugPrint('No se guardó: todavía no se pudo leer lo que había en la nube');
       return;
@@ -54,29 +125,35 @@ class Datos {
 
     try {
       final texto = jsonEncode(carreras.map((c) => c.toJson()).toList());
-      await _db
-          .collection('profesores')
-          .doc(dni)
-          .set({'datos': texto}).timeout(_espera);
+      await _docProfesor(uid)
+          .set({'datos': texto}, SetOptions(merge: true))
+          .timeout(_espera);
     } catch (e) {
       debugPrint('Error al guardar en Firestore: $e');
     }
   }
 
-  // Lee lo guardado en la nube. Se llama al abrir la app (en main.dart).
+  // Lee el perfil y los datos del profesor que inició sesión.
+  // Se llama al abrir la app (main.dart) y al iniciar sesión.
   static Future<void> cargar() async {
-    final dni = await _dniProfesor();
-    if (dni == null) return;
+    final uid = _uid;
+    if (uid == null) return;
 
     try {
-      final doc =
-          await _db.collection('profesores').doc(dni).get().timeout(_espera);
-      final texto = doc.data()?['datos'] as String?;
+      final doc = await _docProfesor(uid).get().timeout(_espera);
+      final data = doc.data() ?? {};
+
+      profesor = Profesor(
+        nombre: data['nombre'] as String? ?? '',
+        dni: data['dni'] as String? ?? '',
+        email: data['email'] as String? ?? _auth.currentUser?.email ?? '',
+      );
+
+      final texto = data['datos'] as String?;
+      carreras.clear();
       if (texto != null) {
         final lista = jsonDecode(texto) as List;
-        carreras
-          ..clear()
-          ..addAll(lista.map((c) => Carrera.fromJson(c)));
+        carreras.addAll(lista.map((c) => Carrera.fromJson(c)));
       }
       _cargado = true;
       await sincronizarAsistencias();
@@ -87,12 +164,12 @@ class Datos {
 
   // Actualiza la lista de presentes de cada clase con lo que hay en la nube.
   static Future<void> sincronizarAsistencias() async {
-    final dni = await _dniProfesor();
-    if (dni == null) return;
+    final uid = _uid;
+    if (uid == null) return;
 
     final snap = await _db
         .collection('asistencias')
-        .where('profesor', isEqualTo: dni)
+        .where('profesor', isEqualTo: uid)
         .get()
         .timeout(_espera);
 
@@ -123,8 +200,25 @@ class Datos {
       hora: DateTime.parse(data['hora'] as String),
       nombreAnterior: data['nombreAnterior'] as String?,
       dniAnterior: data['dniAnterior'] as int?,
+      foto: data['foto'] as String?,
     );
   }
+
+  // ----------------------------------------------------------- Ajustes
+
+  static Future<void> cargarAjustes() async {
+    final prefs = await SharedPreferences.getInstance();
+    minutosQr = prefs.getInt('ajuste_minutos_qr') ?? 10;
+    radioMetros = prefs.getInt('ajuste_radio') ?? 100;
+  }
+
+  static Future<void> guardarAjustes() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('ajuste_minutos_qr', minutosQr);
+    await prefs.setInt('ajuste_radio', radioMetros);
+  }
+
+  // ----------------------------------------------------------- Dispositivo del alumno
 
   // Cada dispositivo puede registrar una sola asistencia por clase.
   static Future<bool> dispositivoYaRegistro(String claseId) async {
@@ -140,18 +234,6 @@ class Datos {
   static Future<void> eliminarAsistenciaDispositivo(String claseId) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('$claveAsistenciaDispositivo$claseId');
-  }
-
-  // Crea la carrera y la materia si todavía no existen
-  static void agregarMateria(String carrera, String materia) {
-    var c = carreras.where((c) => c.nombre == carrera).firstOrNull;
-    if (c == null) {
-      c = Carrera(nombre: carrera);
-      carreras.add(c);
-    }
-    final existe = c.materias.any((m) => m.nombre == materia);
-    if (!existe) c.materias.add(Materia(nombre: materia));
-    guardar();
   }
 
   // ---------------------------------------------------------------- QR
@@ -174,33 +256,6 @@ class Datos {
     return (latitud: latitud, longitud: longitud);
   }
 
-  // El profesor publica en la nube cuál es el QR vigente de la clase.
-  // Si genera uno nuevo, el anterior deja de servir.
-  static Future<void> publicarQr(Clase clase, String qr) async {
-    await _db.collection('clases').doc(clase.id).set({
-      'qr': qr,
-      'materia': clase.materia,
-      'fecha': clase.fecha,
-      'profesor': await _dniProfesor(),
-    }).timeout(_espera);
-  }
-
-  // El QR no se cierra al salir de la pantalla: sigue valiendo hasta que venza
-  // (10 minutos), así el profesor puede cerrar la app y volver sin perderlo.
-  // Esta función devuelve el QR vigente de la clase, o null si no hay o ya venció.
-  static Future<String?> qrVigente(String claseId) async {
-    final doc =
-        await _db.collection('clases').doc(claseId).get().timeout(_espera);
-    final qr = doc.data()?['qr'] as String?;
-    if (qr == null || qr.isEmpty) return null;
-
-    final momento = momentoQr(qr);
-    if (momento == null) return null;
-
-    final edad = DateTime.now().difference(momento);
-    return edad.inSeconds < minutosValidez * 60 ? qr : null;
-  }
-
   // Momento en que se generó un QR (viene escrito dentro del propio texto del QR)
   static DateTime? momentoQr(String qr) {
     final partes = qr.split('|');
@@ -209,22 +264,62 @@ class Datos {
     return ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
   }
 
-  // Lo usa el alumno: devuelve los datos de la clase (id, materia, fecha, profesor)
-  // si el QR es el vigente y no venció, o null si no sirve.
+  // El profesor activa el QR: queda publicado en la nube junto con su duración
+  // y la distancia máxima permitida. Si había otro, el anterior deja de servir.
+  static Future<void> publicarQr(Clase clase, String qr) async {
+    await _db.collection('clases').doc(clase.id).set({
+      'qr': qr,
+      'materia': clase.materia,
+      'fecha': clase.fecha,
+      'profesor': _uid,
+      'minutos': minutosQr,
+      'radio': radioMetros,
+    }).timeout(_espera);
+  }
+
+  // El profesor desactiva el QR: desde ese momento nadie más puede registrarse
+  static Future<void> desactivarQr(String claseId) async {
+    await _db
+        .collection('clases')
+        .doc(claseId)
+        .set({'qr': ''}, SetOptions(merge: true))
+        .timeout(_espera);
+  }
+
+  // Cuándo vence un QR activo, o null si no hay QR activo (o ya venció).
+  // Se usa al abrir la pantalla de la clase para mostrar el mismo QR que estaba.
+  static Future<({String qr, DateTime vence})?> qrActivo(String claseId) async {
+    final doc =
+        await _db.collection('clases').doc(claseId).get().timeout(_espera);
+    final data = doc.data();
+    final qr = data?['qr'] as String?;
+    if (qr == null || qr.isEmpty) return null;
+
+    final momento = momentoQr(qr);
+    if (momento == null) return null;
+
+    final minutos = data?['minutos'] as int? ?? 10;
+    final vence = momento.add(Duration(minutes: minutos));
+    if (!DateTime.now().isBefore(vence)) return null;
+    return (qr: qr, vence: vence);
+  }
+
+  // Lo usa el alumno: devuelve los datos de la clase (id, materia, fecha,
+  // profesor, radio) si el QR es el activo y no venció, o null si no sirve.
   static Future<Map<String, dynamic>?> validarQr(String codigo) async {
     final partes = codigo.split('|');
     if (partes.length != 5 || partes[0] != 'aulacheck') return null;
 
-    final momento = int.tryParse(partes[2]);
+    final momento = momentoQr(codigo);
     if (momento == null) return null;
-
-    final edad = DateTime.now().millisecondsSinceEpoch - momento;
-    if (edad > minutosValidez * 60 * 1000) return null;
 
     final doc =
         await _db.collection('clases').doc(partes[1]).get().timeout(_espera);
     final data = doc.data();
     if (data == null || data['qr'] != codigo) return null;
+
+    final minutos = data['minutos'] as int? ?? 10;
+    if (DateTime.now().difference(momento).inSeconds > minutos * 60) return null;
 
     return {...data, 'id': partes[1]};
   }
@@ -251,6 +346,7 @@ class Datos {
       // Solo si el alumno cambió sus datos desde la última vez (aviso para el profesor)
       if (alumno.nombreAnterior != null) 'nombreAnterior': alumno.nombreAnterior,
       if (alumno.dniAnterior != null) 'dniAnterior': alumno.dniAnterior,
+      if (alumno.foto != null) 'foto': alumno.foto,
     }).timeout(_espera);
     return true;
   }
@@ -296,11 +392,12 @@ class Datos {
       }
       await _db.collection('asistencias').doc('${claseId}_${alumno.dni}').set({
         'claseId': claseId,
-        'profesor': await _dniProfesor(),
+        'profesor': _uid,
         'nombre': alumno.nombre,
         'dni': alumno.dni,
         'registro': alumno.registro,
         'hora': alumno.hora.toIso8601String(),
+        if (alumno.foto != null) 'foto': alumno.foto,
       }).timeout(_espera);
     } catch (e) {
       debugPrint('Error al corregir la asistencia: $e');

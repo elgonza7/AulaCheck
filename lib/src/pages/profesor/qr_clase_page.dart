@@ -9,34 +9,44 @@ import 'package:aulacheck/src/services/datos.dart';
 import 'package:aulacheck/src/services/pdf_service.dart';
 import 'package:aulacheck/src/config/app_theme.dart';
 import 'package:aulacheck/src/widgets/estado_vacio.dart';
+import 'package:aulacheck/src/widgets/avatar_alumno.dart';
 import 'package:aulacheck/src/widgets/layout_base.dart';
 
-// Muestra el QR de una clase. Dura 10 minutos y después se puede volver a generar.
+// Pantalla de una clase (un día). El QR NO se genera solo al entrar:
+// el profesor lo activa con el botón de arriba y lo puede desactivar cuando quiera.
+// Si se pasa el tiempo (Ajustes) vence solo. Solo se puede activar el día de la clase.
 class QrClasePage extends StatefulWidget {
   final Materia materia;
   final Clase clase;
+  final bool activarAlAbrir; // true cuando la clase se acaba de crear
 
-  const QrClasePage({super.key, required this.materia, required this.clase});
+  const QrClasePage({
+    super.key,
+    required this.materia,
+    required this.clase,
+    this.activarAlAbrir = false,
+  });
 
   @override
   State<QrClasePage> createState() => _QrClasePageState();
 }
 
 class _QrClasePageState extends State<QrClasePage> {
-  late String qrData;
-  late DateTime vence;
+  String? qrData; // null = no hay QR activo
+  DateTime? vence;
   bool ordenAlfabetico = false;
-  bool cargandoUbicacion = true;
-  String? errorUbicacion;
+  bool cargando = true; // leyendo de la nube o pidiendo el GPS
   Timer? timer;
   StreamSubscription<List<Alumno>>? suscripcionAsistencias;
 
-  bool get vencido => !DateTime.now().isBefore(vence);
+  // El QR está activo si existe y todavía no venció
+  bool get activo =>
+      qrData != null && vence != null && DateTime.now().isBefore(vence!);
 
   @override
   void initState() {
     super.initState();
-    inicializarQr();
+    cargarQrActivo();
 
     // Escucha en la nube a los alumnos que van registrando su asistencia
     suscripcionAsistencias =
@@ -58,47 +68,62 @@ class _QrClasePageState extends State<QrClasePage> {
     super.dispose();
   }
 
-  // Si el profesor ya generó un QR que todavía no venció (por ejemplo, cerró la app
-  // y volvió a entrar), se reutiliza el mismo con el tiempo que le queda.
-  // Solo se crea uno nuevo si venció o si se pide con "forzarNuevo".
-  Future<void> inicializarQr({bool forzarNuevo = false}) async {
-    try {
-      if (!forzarNuevo) {
-        final existente = await Datos.qrVigente(widget.clase.id);
-        if (!mounted) return;
-        if (existente != null) {
-          qrData = existente;
-          vence = Datos.momentoQr(existente)!
-              .add(const Duration(minutes: Datos.minutosValidez));
-          setState(() {
-            cargandoUbicacion = false;
-            errorUbicacion = null;
-          });
-          return;
-        }
-      }
+  void mostrarMensaje(String texto) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
+  }
 
-      final posicion = await obtenerUbicacion();
+  // Al entrar: si ya había un QR activo (por ejemplo, cerraste la app y volviste),
+  // se muestra el mismo con el tiempo que le queda. Si no, queda desactivado.
+  Future<void> cargarQrActivo() async {
+    try {
+      final existente = await Datos.qrActivo(widget.clase.id);
       if (!mounted) return;
-      qrData = Datos.generarQr(
+      qrData = existente?.qr;
+      vence = existente?.vence;
+    } catch (_) {
+      // Sin conexión: se muestra como desactivado
+    }
+    if (!mounted) return;
+    setState(() => cargando = false);
+
+    // Clase recién creada: se activa sola la primera vez
+    if (widget.activarAlAbrir && !activo) activarQr();
+  }
+
+  // Crea un QR nuevo con la ubicación del profesor y lo publica en la nube
+  Future<void> activarQr() async {
+    if (!widget.clase.esDeHoy) {
+      mostrarMensaje('Solo se puede activar el QR el día de la clase');
+      return;
+    }
+    setState(() => cargando = true);
+    try {
+      final posicion = await obtenerUbicacion();
+      final nuevo = Datos.generarQr(
         widget.clase,
         posicion.latitude,
         posicion.longitude,
       );
-      vence = DateTime.now().add(const Duration(minutes: Datos.minutosValidez));
-      await Datos.publicarQr(widget.clase, qrData); // el alumno lo valida contra la nube
-      if (!mounted) return;
-      setState(() {
-        cargandoUbicacion = false;
-        errorUbicacion = null;
-      });
+      await Datos.publicarQr(widget.clase, nuevo);
+      qrData = nuevo;
+      vence = DateTime.now().add(Duration(minutes: Datos.minutosQr));
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        cargandoUbicacion = false;
-        errorUbicacion = e.toString();
-      });
+      if (mounted) mostrarMensaje('No se pudo activar el QR: $e');
     }
+    if (mounted) setState(() => cargando = false);
+  }
+
+  // Borra el QR de la nube: desde ahora nadie más puede registrarse
+  Future<void> desactivarQr() async {
+    setState(() => cargando = true);
+    try {
+      await Datos.desactivarQr(widget.clase.id);
+      qrData = null;
+      vence = null;
+    } catch (e) {
+      if (mounted) mostrarMensaje('No se pudo desactivar el QR: $e');
+    }
+    if (mounted) setState(() => cargando = false);
   }
 
   Future<Position> obtenerUbicacion() async {
@@ -120,16 +145,21 @@ class _QrClasePageState extends State<QrClasePage> {
     );
   }
 
-  Future<void> generarNuevoQr() async {
-    setState(() {
-      cargandoUbicacion = true;
-      errorUbicacion = null;
-    });
-    await inicializarQr(forzarNuevo: true);
+  // Avisa si el alumno no está en el padrón o figura con otro nombre
+  List<Widget> avisoPadron(Alumno alumno) {
+    const estilo = TextStyle(color: Colors.orange, fontSize: 12);
+    final ins = widget.materia.inscriptoPorDni(alumno.dni);
+    if (ins == null) {
+      return [const Text('⚠ No está en el padrón de la materia', style: estilo)];
+    }
+    if (ins.nombre.trim().toLowerCase() != alumno.nombre.trim().toLowerCase()) {
+      return [Text('⚠ En el padrón figura como "${ins.nombre}"', style: estilo)];
+    }
+    return [];
   }
 
   String tiempoRestante() {
-    final resto = vence.difference(DateTime.now());
+    final resto = vence!.difference(DateTime.now());
     final min = resto.inMinutes.toString().padLeft(2, '0');
     final seg = (resto.inSeconds % 60).toString().padLeft(2, '0');
     return '$min:$seg';
@@ -228,6 +258,23 @@ class _QrClasePageState extends State<QrClasePage> {
         context,
         '${widget.materia.nombre} - ${clase.fecha}',
         actions: [
+          // Activar / desactivar el QR (al lado del PDF)
+          if (!cargando)
+            activo
+                ? TextButton.icon(
+                    onPressed: desactivarQr,
+                    icon: const Icon(Icons.qr_code_2, color: Colors.red),
+                    label: const Text(
+                      'Desactivar',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  )
+                : TextButton.icon(
+                    // Una clase de otro día ya no se puede activar
+                    onPressed: clase.esDeHoy ? activarQr : null,
+                    icon: const Icon(Icons.qr_code),
+                    label: const Text('Activar'),
+                  ),
           IconButton(
             icon: const Icon(Icons.picture_as_pdf),
             tooltip: 'Descargar lista de esta clase',
@@ -238,46 +285,29 @@ class _QrClasePageState extends State<QrClasePage> {
       body: Column(
         children: [
           const SizedBox(height: 24),
-          if (cargandoUbicacion)
-            const Expanded(
-              child: Center(
-                child: CircularProgressIndicator(),
-              ),
+          if (cargando)
+            const Padding(
+              padding: EdgeInsets.all(40),
+              child: CircularProgressIndicator(),
             )
-          else if (errorUbicacion != null)
-            Expanded(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.location_off, size: 64, color: Colors.red),
-                      const SizedBox(height: 12),
-                      Text(
-                        errorUbicacion!,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: generarNuevoQr,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Reintentar'),
-                      ),
-                    ],
-                  ),
-                ),
+          else if (!activo) ...[
+            Icon(Icons.qr_code_2, size: 80, color: context.textoSuave),
+            const SizedBox(height: 8),
+            const Text(
+              'QR desactivado',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                clase.esDeHoy
+                    ? 'Tocá "Activar" para mostrar el QR durante '
+                        '${Datos.minutosQr} minutos.'
+                    : 'Esta clase ya pasó: el QR solo se puede activar el día de la clase.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: context.textoSuave),
               ),
-            )
-          else if (vencido) ...[
-            const Icon(Icons.timer_off, size: 80, color: Colors.grey),
-            const SizedBox(height: 8),
-            const Text('El QR venció'),
-            const SizedBox(height: 8),
-            ElevatedButton.icon(
-              onPressed: generarNuevoQr,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Generar QR nuevo'),
             ),
           ] else ...[
             // El QR va sobre un marco blanco para que se escanee bien en tema oscuro
@@ -288,7 +318,7 @@ class _QrClasePageState extends State<QrClasePage> {
                 borderRadius: BorderRadius.circular(AppTheme.radio),
               ),
               child: QrImageView(
-                data: qrData,
+                data: qrData!,
                 size: 220,
                 backgroundColor: Colors.white,
               ),
@@ -347,21 +377,18 @@ class _QrClasePageState extends State<QrClasePage> {
                   ),
                 for (final alumno in alumnos)
                   ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: AppTheme.violeta.withAlpha(60),
-                      child: Text(
-                        iniciales(alumno.nombre),
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                    leading: AvatarAlumno(
+                      nombre: alumno.nombre,
+                      foto: alumno.foto,
                     ),
                     title: Text(alumno.nombre),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('DNI: ${alumno.dni}'),
+                        // Comparación con el padrón de la materia (si hay padrón cargado)
+                        if (widget.materia.inscriptos.isNotEmpty)
+                          ...avisoPadron(alumno),
                         // Aviso: el alumno cambió sus datos desde la última vez
                         if (alumno.cambioDatos)
                           Text(

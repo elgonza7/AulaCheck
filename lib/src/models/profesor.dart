@@ -1,13 +1,13 @@
+// El profesor ya no guarda carrera ni materia: puede tener varias,
+// y se crean desde "Mis carreras".
 class Profesor {
   String nombre;
   String dni;
-  String carrera;
-  String materia;
+  String email;
 
   Profesor({
     required this.nombre,
     required this.dni,
-    required this.carrera,
-    required this.materia,
+    required this.email,
   });
 }

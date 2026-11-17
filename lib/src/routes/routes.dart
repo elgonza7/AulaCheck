@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:aulacheck/src/pages/alumno/alumno_page.dart';
 import 'package:aulacheck/src/pages/profesor/professor_page.dart';
 import 'package:aulacheck/src/pages/home/home_page.dart';
-import 'package:aulacheck/src/pages/profesor/carreras_page.dart';
+import 'package:aulacheck/src/pages/profesor/cruds/carreras_page.dart';
 import 'package:aulacheck/src/pages/settings/settings_page.dart';
 
 class Rutas {
