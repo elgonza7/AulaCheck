@@ -160,7 +160,7 @@ class _AlumnoPageState extends State<AlumnoPage> {
           dni: dniNumero,
           nombreAnterior: cambio ? regNombre : null,
           dniAnterior: cambio ? regDni : null,
-          foto: foto, // para que el profe vea la cara en la lista
+          foto: foto, 
         ),
       );
       if (!mounted) return;
