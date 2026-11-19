@@ -114,7 +114,7 @@ class Datos {
   // ----------------------------------------------------------- Guardar y leer
 
   // Sube todas las carreras (con materias y clases) a la nube.
-  // OJO: llamarla cada vez que cambio algo, si no, no se guarda.
+  // ojito: llamarla cada vez que cambio algo, si no, no se guarda.
   static Future<void> guardar() async {
     final uid = _uid;
     if (uid == null) return;
@@ -134,7 +134,7 @@ class Datos {
   }
 
   // Trae el perfil y los datos del profe logueado.
-  // Se llama en main() y cuando inicia sesión.
+  // Se llama en main() y cuando inicia sesión para que no se pierdan los datos al cambiar de celu.
   static Future<void> cargar() async {
     final uid = _uid;
     if (uid == null) return;
